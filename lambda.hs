@@ -23,19 +23,23 @@ pp (Abstr vn e) = "\\" ++ vn ++ "." ++ (pp e)
 -- SEMANTICS
 ---------------------------------------------------------------------------------
 
+-- Top level funciton, takes in Expr and outputs reduced expr
 bReduc :: Expr -> Expr
 bReduc (Var vn) = (Var vn)
 bReduc (Abstr vn e) = (Abstr vn (bReduc e))
 bReduc (App e1 e2) = bApp (bReduc e1) (bReduc e2)
 
+-- Helper function for bReduc, for beta applications
 bApp :: Expr -> Expr -> Expr
 bApp (Abstr vn e1) e2 = let e2' = bReduc e2 in
                             let e1' = replaceVar vn e2' e1 in
                                 bReduc e1'
 bApp e1 e2 = App (bReduc e1) (bReduc e2)
 
+-- Helper function for bReduc.bApp, finds and replaces "needle" with "repl" in
+-- "haystack".
 --            needle     repl    haystack
-replaceVar :: VarName -> Expr -> Expr -> Expr
+replaceVar :: VarName -> Expr -> Expr       -> Expr
 replaceVar ndl repl (Var hstk) = if ndl == hstk then repl else Var hstk
 replaceVar ndl repl (App hstk1 hstk2) = App (replaceVar ndl repl hstk1) 
                                             (replaceVar ndl repl hstk2)
