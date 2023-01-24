@@ -1,0 +1,27 @@
+map f:
+x1 ... xn --> f x1 ... f xn
+
+fold g:
+... xn --> x1 `g` ... `g` xn        -- AMBIGUOUS!
+x1 ... xn --> g (x1 (g (... xn)))   -- NOT VERY CLEAR
+
+insert:
+y, x1 ... xn --> x1 ... xk y x{k+1} ... xn    -- HOW TO IDENTIFY k?
+| y > (x1 ... xk)
+| y <= x{k+1}
+
+lookup:
+a, ... (a,x) ... --> x
+-- MAYBE SPECIAL CASE OF:
+a, p1 ... (a,x) ... pn --> x     -- AMBIGUOUS!
+a, (a1,_) ... (ak,_) (a,x) ... pn --> x
+| a /= (a1 ... ak)
+
+
+rdup:
+x1 ... x ... x ... xn --> x1 ... x ... xn
+
+fac:
+n -> n * (n-1) * ... * 2 * 1
+
+
