@@ -1,0 +1,257 @@
+meeting w7 (2023-02-21)
+
+=================================================================================
+Progress:
+=================================================================================
+
+Only had 2 hours to work; started eval
+
+=================================================================================
+Q&A:
+=================================================================================
+
+fun vs abstr
+
+apply fun with app?
+
+=================================================================================
+Notes:
+=================================================================================
+
+see operational semantics of app rule
+
+=================================================================================
+Deliverables:
+=================================================================================
+
+finish eval
+
+do semantics in ellipsis
+
+
+
+
+meeting w6 (2023-02-14)
+
+=================================================================================
+Progress:
+=================================================================================
+
+do map function in my abstract syntax:
+
+let rec map = (\f.\l.case l of:
+    Empty       -> Empty
+    Otherwise   -> Cons (f (head l)) (map f (tail l)))
+
+
+
+think about how that map function could be represented by our pattern language
+
+We know:
+map f:
+x1, ..., xn -> f x1, ..., f xn
+
+abstract syntax for pattern language -- start based on map --- look at all functions
+
+See ellipsis.hs
+
+=================================================================================
+Q&A:
+=================================================================================
+
+Just where to go from here
+
+=================================================================================
+Notes:
+=================================================================================
+
+Let should be let rec
+
+ellipsis.hs only really need one type of name
+
+list of parameter name
+
+synoynm for string
+
+infinite application using same style as List Expl Expl or Cons (currying style)
+
+Var String is all I really need
+
+Position in list will have to be smart, a sublanguage
+
+Semantics directly
+
+Write interpreter? Write in lambda calculus?
+
+Map or compile to fn'al langauge -- meaning in terms of an explanation
+
+Pattern language simpler than lambda, less expressive, all pattern langauge can
+go to lambda, but not all lambda can go to pattern language
+
+lambda calculus:
+don't replace expressions, too much
+write a f'n Expr -> Value
+Incldue operations on integers, +, binop
+Val for values that
+
+Function 
+eval :: Env -> Expr -> Val
+
+Env list of (name, value)
+
+Expr has vals in it -- maybe just make vals a possiblitiy of expr
+
+Nested constructors, smart constructors
+
+A value is a pretty general thing
+
+
+
+=================================================================================
+Deliverables:
+=================================================================================
+implement eval (test)
+
+
+
+
+
+
+
+meeting w4 (2023-01-31)
+
+=================================================================================
+Progress:
+=================================================================================
+
+Read types and PLs chapters 10, 11.5, 11.6, 11.9, 11.12
+Implemented let, case, lists (and prettyprinted them)
+
+=================================================================================
+Q&A:
+=================================================================================
+
+What is |-> (see pg 124, not |- )
+substitution
+
+=================================================================================
+Notes:
+=================================================================================
+
+let map = (
+
+
+
+) in ABCABC
+
+check f'n might be complicated -- offramp is find a semantics for the pattern
+language 
+
+Our ellipsis is DEFINED to be solid, not inductive
+
+added syntactic sugar
+
+very precise about our definition of ellipsis
+
+pattern P
+
+semantic f'n S : P -> D
+
+langauge L
+
+S' : L -> D
+
+check : P * L -> B
+
+Probably can't express general recursion
+
+Saved by limited language
+
+
+Semantics of pattern language
+
+Then:
+
+Check (p,l) => S(p) = S'(l)
+
+Compile : P -> L
+
+Explain : L -> P
+
+
+
+
+=================================================================================
+Deliverables:
+=================================================================================
+do map function in my abstract syntax
+think about how that map function could be represented by our pattern language
+abstract syntax for pattern language -- start based on map --- look at all functions\
+
+
+
+
+
+
+
+
+
+meeting w3 (2023-01-24)
+
+=================================================================================
+Progress:
+=================================================================================
+Made lambda calculus
+With beta reduction
+Possibly erroneous
+
+=================================================================================
+Q&A:
+=================================================================================
+Current example "captures free variable y", is that ok? what do?
+
+Test suite for lambda calculus? too trivial?
+
+What feature to add to start out? Lists? Or are we doing the super lambdacalculusy list?
+
+=================================================================================
+Notes:
+=================================================================================
+
+Lists added
+
+Abstract syntax for ellipsis
+
+Pattern langauge, explanation langauge is the ellipsis langauge (Expl)
+
+check :: Expr -> Expl -> Bool
+
+Lambda calculus map, true matches explanation
+
+add let expressions
+
+let map f 
+
+Case expression lambda calculus
+
+Read types and programming langauges chapters 11.6, 11.9, let expressions, 
+
+Play with case expressions
+
+Case deconstructs and analyzes
+
+extend lambda calculus syntax by lists, case, and let
+
+do map fucntion in my abstract syntax
+
+THEN
+
+Think about an explanation langauge
+
+THEN
+
+think about check function
+
+=================================================================================
+Deliverables:
+=================================================================================

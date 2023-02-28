@@ -2,7 +2,7 @@ map f:
 x1 ... xn --> f x1 ... f xn
 
 fold g:
-... xn --> x1 `g` ... `g` xn        -- AMBIGUOUS!
+x1 ... xn --> x1 `g` ... `g` xn        -- AMBIGUOUS!
 x1 ... xn --> g (x1 (g (... xn)))   -- NOT VERY CLEAR
 
 insert:
