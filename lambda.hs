@@ -12,19 +12,100 @@ data Expr = Var Name
           | Let Name Expr Expr
           | Case Expr Val Expr Expr
           | LetRec Name Expr Expr
+          | Fix Expr
+          | Add Expr Expr
+          | Tail Expr 
           deriving (Eq, Show)
 
-data Val = Con Int | Cons Int Val | Empty | Fun Name Expr
+data Val = Con Int 
+           | Cons Int Val 
+           | Empty 
+           | Fun Name Expr 
+           | Plus Val Val
+           | Fixed Expr
+           | FloatingVar Name
          deriving (Eq, Show)
 
 type Name = String
 
 type Env = [(Name, Val)]
 
+
+
+---------------------------------------------------------------------------------
+-- SEMANTICS
+-- ASSUME EVERY VARIABLE IS NAMED SEPARATELY
+---------------------------------------------------------------------------------
+
+ycomb = Abstr "f" $ 
+            App (Abstr "x" $ App (Var "f" ) (App (Var "x") (Var "x"))) 
+                (Abstr "x" $ App (Var "f" ) (App (Var "x") (Var "x")))
+
+-- \f.( (\x.(f (x x))) (\x.(f (x x))) )
+
+eval :: Env -> Expr -> Val
+eval e (Var vn)            = envLookup e vn
+eval e (App t1 t2)         = case (eval e t1) of 
+                                Fun x t1b   -> eval ((x, eval e t2):e) t1b
+                                _           -> error ("Expected fn to be applied")
+eval e (Abstr x t)         = Fun x t
+eval e (Let n t1 t2)       = eval ((n, eval e t1):e) t2
+eval e (Case tc v t1 t2)   = if (eval e tc) == v
+                                then (eval e t1)
+                                else (eval e t2)
+eval e (Add t1 t2)         = case (eval e t1, eval e t2) of
+                                (Con i1, Con i2)    -> Con (i1 + i2)
+                                _                   -> Plus (eval e t1) (eval e t2)
+eval e (LetRec n t1 t2)    = case (eval e t1) of
+                                Fun _ _     -> eval ((n, eval e $ App ycomb (Abstr n t1)):e) t2
+                                _           -> error "Expected fn to be letrecced"
+eval e (Value v)            = v
+eval e (Tail t)             = case (eval e t) of
+                                (Cons _ tail)           -> tail
+                                _                       -> error ("not a list " ++ (show t))
+
+
+
+envLookup :: Env -> Name -> Val
+envLookup [] name                       = FloatingVar name 
+                                        --error $ "envLookup: can't find " ++ name ++ " in env"
+envLookup ((env_name, env_val):xs) name = if name == env_name then env_val
+                                          else (envLookup xs name)
+
+
+plusfive = Abstr "x" $ Add (Var "x") (Value $ Con 5)
+
+
+plus = Abstr "x" $ Abstr "y" $ Add (Var "x") (Var "y")
+
+stz' = (Abstr "x" $ 
+         Case (Var "x") 
+             (Con 0)     (Value $ Con 0) 
+                         (Add (Var "x") (App (Var "stz") (Add (Var "x") (Value $ Con (-1)))))
+       )
+
+stz = LetRec "stz" stz'
+-- eval [] $ stz (App (Var "stz") (Value $ Con 10))
+
+len' = (Abstr "l" $
+        Case (Var "l")
+            Empty       (Value $ Con 0)
+                        (Add (Value $ Con 1) (App (Var "len") (Tail (Var "l"))))
+       )
+
+len = LetRec "len" len'
+
 pp :: Expr -> String
 pp (Var vn)         = vn
 pp (App e1 e2)      = "(" ++ (pp e1) ++ " " ++ (pp e2) ++ ")"
 pp (Abstr vn e)     = "\\" ++ vn ++ "." ++ (pp e)
+
+main :: IO ()
+main = do
+  putStrLn $ show $ eval [] $ 
+                len (App (Var "len") (Value $ Cons 100 $ Cons 2 $ Cons 3 $ Cons 5 Empty))
+
+{-
 pp (Value (Con i))  = show i
 pp (Value Empty)    = ""
 pp (Value (Cons i e)) = "[" ++ ppCons (Cons i e) ++ "]"
@@ -36,45 +117,6 @@ pp (Value (Fun n e)) = n ++ " " ++ (pp e)
 ppCons :: Val -> String
 ppCons (Cons i (Cons i2 e))     = show i ++ "," ++ ppCons (Cons i2 e)
 ppCons (Cons i _)               = show i
-
-
----------------------------------------------------------------------------------
--- SEMANTICS
--- ASSUME EVERY VARIABLE IS NAMED SEPARATELY
----------------------------------------------------------------------------------
-
-eval :: Env -> Expr -> Val
-eval ev ex     = eval' ev (bReduc ex) -- Don't need beta reduction
-
-eval' :: Env -> Expr -> Val
-eval' e (Var vn)            = envLookup e vn
-eval' e (App e1 e2)         = case (eval' e e1) of 
-                                Fun x e'    -> eval' ((x, eval' e e2):e) e'
-                                _           -> error "Expected fn to be applied"
-eval' e (Abstr x b)         = Fun x b
-eval' e (Value v)           = v
-eval' e (Let n e1 e2)       = eval' ((n, eval' e e1):e) e2
-eval' e (Case ec v e1 e2)   = if (eval' e ec) == v
-                                then (eval' e e1)
-                                else (eval' e e2)
-eval' e (LetRec n e1 e2)    = error "wait wait not yet"
-
--- case eval Expr of 
---  Val -> eval Expr
---  ow  -> eval Expr
-
--- try to impelment length
--- add let rec
-
--- applFun :: Env -> Val -> Expr -> Val
--- applFun e (Fun fn b) i = case (fn, i) of
---                           ("+", (App (Value $ Con i1))
-
-envLookup :: Env -> Name -> Val
-envLookup [] _                          = error "envLookup: can't find var name in environment"
-envLookup ((env_name, env_val):xs) name = if name == env_name then env_val
-                                          else (envLookup xs name)
-
 
 bReduc :: Expr -> Expr
 bReduc e = bReduc' e
@@ -103,7 +145,6 @@ replaceVar ndl repl (App hstk1 hstk2) = App (replaceVar ndl repl hstk1)
 replaceVar ndl repl (Abstr hstk_vn hstk_e) = Abstr hstk_vn 
                                                    (replaceVar ndl repl hstk_e)
 
-{-
 EXAMPLE I FAILED ON?
 
 (\x.\y.(y x) (y w))         

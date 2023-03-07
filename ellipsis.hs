@@ -7,8 +7,7 @@ data Expl = Ellipsis
           | App Expl Expl
           | App2Infx Expl Expl Expl
           deriving Show
-
-data SubScript = Expression of some sort | Constant of some sort |
+-- data SubScript = Expression of some sort | Constant of some sort |
 -- index arithmetic!
 -- index expressions
 
