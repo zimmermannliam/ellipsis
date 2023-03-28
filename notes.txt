@@ -1,25 +1,77 @@
+pg 72
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 meeting w8 (2023-03-7)
 =================================================================================
 Progress:
 =================================================================================
-
+Made letrec
 
 =================================================================================
-Q&A:
+Pre-meeting notes and questions
 =================================================================================
 
-Where is this concept of "val" from?
+Where is this concept of "val" from? 
+-> Various books
+-> John Mitchell        Foundations of Programming Languages
+-> 
+
+Explore Fix:
+
+f (Fix f) = Fix f
+
+Y combinator does that ^
+
+Don't have a great intuition regarding y combinator, but I think I understand
+fix and fixed points and how it ties into my letrec
+
+
 
 =================================================================================
 Notes:
 =================================================================================
 
+to make pattern matching need to make pattern as a type
+
+evaluate patterns against expressions to produce bindings
+      or expressions against patterns
+
+pattern could fail, not match, account for failure
+
+we were starting with call by value
+
+but peyton jones is call by name -- would get rid of values
 
 =================================================================================
 Deliverables:
 =================================================================================
+Read simon peyton jones -- Compiling of functional languages
+make patterns -- follow peyton jones closely
+ints bools and lists
 
-
+add ellipsis as a pattern
+and expressions
 
 
 
