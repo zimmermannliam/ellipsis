@@ -1,4 +1,73 @@
+
+What is ellipsis?
+
+
+
+
+
+
+
+Lost my computer
+
+What are the things I need to think of?
+
+An ellipsis is basically the name of the list (y) and the length of the list (n).
+
+
+What is allowed?
+y1 ... yn   -> yi
+y1 ... yn   -> y1 ... y3
+y1 ... yn   -> yn-5 ... yn
+y1 ... yn   -> yi ... yj
+f, y1 ... yn   -> f y1 ... f yn
+g, y1 ... yn   -> y1 `g` ... `g` yn
+f, y1 ... yn   -> y1 (f y2) ... (f yn-1) yn
+
+What is not allowed?
+
+g, y1 ... yn -> y1 `g` y2 y3 `g` y4 ... yn-1 `g` yn
+
+
+
+identity l:
+case l of
+    Empty       -> Empty
+    y1 ... yn   -> y1 ... yn
+
+map f l:
+case l of
+    Empty       -> Empty
+    y1 ... yn   -> f y1 ... f yn
+
+head l:
+case l of
+    Empty       -> Empty
+    y1 ... yn   -> y1
+
+tail l:
+case l of
+    Empty       -> Empty
+    y1 ... yn   -> y2 ... yn
+
+at l i
+case l of
+    Empty       -> Empty
+    y1 ... yn   -> yi
+
+
+
+
+
+
+
+
+
+
+
+
+
 pg 72
+
 
 
 {-
