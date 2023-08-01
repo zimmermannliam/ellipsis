@@ -10,11 +10,12 @@ data Expr = Var Name
           | Abstr Name Expr
           | Value Val
           | Let Name Expr Expr
-          | Case Expr Possibilities
+          | Case Expr Alts
           | LetRec Name Expr Expr
           | Fix Expr
           | Add Expr Expr
-          | Tail Expr 
+          | Tail Expr
+          | EllipsisE Name Int Int
           deriving (Eq, Show)
 
 data Val = Con Int 
@@ -29,14 +30,14 @@ data Val = Con Int
 data Pattern = PCons Name Name
              | PVar Name
              | PVal Val
-             | Ellipsis
+             | Ellipsis Name Int -- For y1 ... yn, Ellipsis 'y' n
              deriving (Eq, Show)
 
 type Name = String
 
 type Env = [(Name, Val)]
 
-type Possibilities = [(Pattern, Expr)]
+type Alts = [(Pattern, Expr)]
 
 
 
@@ -74,8 +75,8 @@ eval e (Tail t)             = case (eval e t) of
 eval e (Case tc ps)   = patternMatchEval e tc ps
 
 
--- Match all possibilities vs Expr
-patternMatchEval :: Env -> Expr -> Possibilities -> Val 
+-- Match all alternatives vs Expr
+patternMatchEval :: Env -> Expr -> Alts -> Val 
 patternMatchEval e t (p:ps) = case (patternMatch e t p) of
                                 Nothing     -> (patternMatchEval e t ps)
                                 Just v      -> v
@@ -98,3 +99,8 @@ envLookup [] name                       = FreeVar name
 envLookup ((env_name, env_val):xs) name = if name == env_name then env_val
                                           else (envLookup xs name)
 
+ex_list = Cons 1 $ Cons 2 $ Cons 3 $ Cons 4 $ Cons 5 Empty
+
+succ' = Abstr "x" $ Add (Var "x") (Value $ Con 1)
+
+head = Abstr "l" $ Case 
