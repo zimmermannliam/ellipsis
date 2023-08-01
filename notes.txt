@@ -1,8 +1,14 @@
 
 What is ellipsis?
 
+On the LHS, we have:
+y1 ... yn -> <something>
+Which just specifies the name of the list (y) and the length (n)
 
-
+On the RHS, we have
+y1 ... yn -> <something> yi ... yj <something>
+or                     f yi ... f yj
+or?                    yi `f` ... `f` yj
 
 
 
@@ -11,7 +17,6 @@ Lost my computer
 
 What are the things I need to think of?
 
-An ellipsis is basically the name of the list (y) and the length of the list (n).
 
 
 What is allowed?
@@ -26,36 +31,48 @@ f, y1 ... yn   -> y1 (f y2) ... (f yn-1) yn
 What is not allowed?
 
 g, y1 ... yn -> y1 `g` y2 y3 `g` y4 ... yn-1 `g` yn
+any sort of inductive pattern-establishing system
+(i.e. x1 x3 x5 ... xn-5 xn-3 xn-1) would just be:
+      x1 x3 x5 x6 x7 x8 ... xn-7 xn-6 xn-5 xn-3 xn-1)
+
+Ambiguous
+f, y1 ... yn    -> f y1 ... yn
+    It would have to be either
+    f y1 y2 ... yn
+    or 
+    f y1 ... f yn-1 yn
+    So any operation on the ellipsis has to be applied to both sides.
+
+y1 ... yn -> yn ... y1
+    The ellipsis must count up
+
+
 
 
 
 identity l:
 case l of
-    Empty       -> Empty
     y1 ... yn   -> y1 ... yn
 
 map f l:
 case l of
-    Empty       -> Empty
     y1 ... yn   -> f y1 ... f yn
 
 head l:
 case l of
-    Empty       -> Empty
     y1 ... yn   -> y1
 
 tail l:
 case l of
-    Empty       -> Empty
     y1 ... yn   -> y2 ... yn
 
 at l i
 case l of
-    Empty       -> Empty
     y1 ... yn   -> yi
 
-
-
+insert l i k
+case l of
+    y1 ... yn   -> y1 ... yi k yi+1 ... yn
 
 
 
