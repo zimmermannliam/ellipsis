@@ -1,3 +1,27 @@
+Evaluate: does it make sense to use them on the left hand, right hand in examples?
+Pretty printer
+map, fold, reverse, second, length, nth, zip, find
+implement in my language, then how would we define it in
+Don't just store the lenght, then we w would be calculating the length for nothing if it was a small access
+Has to be somethign more compliacted than (name,val) in environment -- 
+Don't do more than necessary computationally
+Write notes to inform thesis -- this step right now is important!
+
+ex: Creating our langauge, what would ellipsis patterns look like, how would we implmenet them, define operational semantics, argue or improve semantics, evaluate expressiveness
+
+Look at library, how many can we implement, how much shorter, and cool cases (or uncool cases), matrices, 
+
+------------------------------------------------------------------------
+
+True design decisions:
+Should yi ... yj i > j count backwards? Yes
+Should we keep a 
+
+
+
+
+
+
 
 What is ellipsis?
 
@@ -44,7 +68,8 @@ f, y1 ... yn    -> f y1 ... yn
     So any operation on the ellipsis has to be applied to both sides.
 
 y1 ... yn -> yn ... y1
-    The ellipsis must count up
+    The ellipsis must count up?
+    OR does yi ... yj, i > j mean count backwards?
 
 
 
