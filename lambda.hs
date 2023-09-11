@@ -15,7 +15,7 @@ data Expr = Var Name
           | Fix Expr
           | Add Expr Expr
           | Tail Expr
-          | EllipsisE Name Int Int
+          | EllipsisE Expr Val Val -- For ym ... yn, Ellipsis y m n
           deriving (Eq, Show)
 
 data Val = Con Int 
@@ -30,7 +30,7 @@ data Val = Con Int
 data Pattern = PCons Name Name
              | PVar Name
              | PVal Val
-             | Ellipsis Name Int -- For y1 ... yn, Ellipsis 'y' n
+             | PEllipsis Name Name -- For y1 ... yn, Ellipsis 
              deriving (Eq, Show)
 
 type Name = String
@@ -82,15 +82,18 @@ patternMatchEval e t (p:ps) = case (patternMatch e t p) of
                                 Just v      -> v
 patternMatchEval e t []     = error "Ran out of patterns"
 
-
 -- Match a single possibility vs Expr
 patternMatch :: Env -> Expr -> (Pattern, Expr) -> Maybe Val
-patternMatch e t ((PVal k), t2)   = if (eval e t) == k then Just (eval e t2)
-                                   else Nothing
-patternMatch e t ((PCons n ns), t2) = case (eval e t) of
-                                        Cons x xs   -> Just $ eval ((n,Con x):(ns,xs):e) t2
-patternMatch e t ((PVar n), t2)   = Just $ eval ((n, (eval e t)):e) t2 
-patternMatch e t _                = Nothing
+patternMatch e t ((PVal k), t2)             = if (eval e t) == k then Just (eval e t2)
+                                                else Nothing
+patternMatch e t ((PCons n ns), t2)         = case (eval e t) of
+                                                Cons x xs   -> Just $ eval ((n,Con x):(ns,xs):e) t2
+                                                _           -> Nothing
+patternMatch e t ((PVar n), t2)             = Just $ eval ((n, (eval e t)):e) t2 
+patternMatch e t ((PEllipsis n len), t2)    = case (eval e t) of
+                                                Cons x xs   -> Nothing
+                                                _           -> Nothing
+patternMatch e t _                          = Nothing
 
 -- Find a variable in environment
 envLookup :: Env -> Name -> Val
@@ -99,8 +102,23 @@ envLookup [] name                       = FreeVar name
 envLookup ((env_name, env_val):xs) name = if name == env_name then env_val
                                           else (envLookup xs name)
 
+
+pp :: Expr -> String
+pp (Var n)  = n
+pp (App e1 e2) = (pp e1) ++ " " ++ (pp e2)
+pp (Abstr n e) = "\\" ++ n ++ "." ++ (pp e)
+pp _ = ""
+
+------------------------------------------------------------------------
+-- EXAMPLES
+------------------------------------------------------------------------
+
 ex_list = Cons 1 $ Cons 2 $ Cons 3 $ Cons 4 $ Cons 5 Empty
 
 succ' = Abstr "x" $ Add (Var "x") (Value $ Con 1)
 
-head = Abstr "l" $ Case 
+head' = Abstr "l" $ Case (Var "l") [(PVal Empty, Value Empty), (PCons "H" "T", Var "H")]
+
+tail' = Abstr "l" $ Case (Var "l") [(PVal Empty, Value Empty), (PCons "H" "T", Var "T")]
+
+
