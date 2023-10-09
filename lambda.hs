@@ -104,10 +104,33 @@ envLookup ((env_name, env_val):xs) name = if name == env_name then env_val
 
 
 pp :: Expr -> String
-pp (Var n)  = n
-pp (App e1 e2) = (pp e1) ++ " " ++ (pp e2)
-pp (Abstr n e) = "\\" ++ n ++ "." ++ (pp e)
-pp _ = ""
+pp (Var n)      = n
+pp (App e1 e2)  = (pp e1) ++ " " ++ (pp e2)
+pp (Abstr n e)  = "\\" ++ n ++ "." ++ (pp e)
+pp (Value v)    = ppVal v
+pp (Let n e1 e2)= "Let " ++ n ++ " = (" ++ (pp e1) ++ ") in " ++ (pp e2)
+pp (Case e a)   = "Case " ++ (pp e) ++ " of " ++ (ppMatch a)
+pp (LetRec  n e1 e2)    = "Letrec " ++ n ++ " = (" ++ (pp e1) ++ ") in " ++ (pp e2)
+pp _            = "Error"
+
+ppMatch :: Alts -> String
+ppMatch []              = ""
+ppMatch ((p, e):as)     = "[ " ++ (ppPattern p) ++ " = " ++ (pp e) ++ " ] "
+
+ppPattern :: Pattern -> String
+ppPattern (PCons n1 n2) = "(" ++ n1 ++ ":" ++ n2 ++ ")"
+ppPattern (PVar n)      = n
+ppPattern (PVal v)      = ppVal v
+ppPattern (PEllipsis n1 n2) = "(" ++ n1 ++ " ... " ++ n2 ++ ")"
+
+ppVal :: Val -> String
+ppVal (Con i)       = show i
+ppVal (Cons i v)    = (show i) ++ (ppVal v)
+ppVal (Empty)       = "Empty"
+ppVal (Fun n e)     = "Function " ++ n ++ " : " ++ (pp e)
+ppVal (Plus v1 v2)  = (ppVal v1) ++ " + " ++ (ppVal v2)
+ppVal (FreeVar n)   = n
+ppVal _             = "Error"
 
 ------------------------------------------------------------------------
 -- EXAMPLES
