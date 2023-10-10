@@ -1,3 +1,6 @@
+Added pretty printer. Now do examples.
+
+
 Evaluate: does it make sense to use them on the left hand, right hand in examples?
 Pretty printer
 map, fold, reverse, second, length, nth, zip, find
