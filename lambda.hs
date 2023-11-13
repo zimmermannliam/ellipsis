@@ -16,12 +16,14 @@ data Expr = Var Name
           | Add Expr Expr
           | Tail Expr
           | EllipsisE Expr Val Val -- For ym ... yn, Ellipsis y m n
+          | ConsE Expr Expr
           deriving (Eq, Show)
 
 data Val = Con Int 
           | Cons Int Val 
           | Empty 
-          | Fun Name Expr 
+          | Closure Name Expr Env
+          | Fun Name Expr
           | Plus Val Val
           | Fixed Expr
           | FreeVar Name
@@ -57,15 +59,15 @@ ycomb = Abstr "f" $
 eval :: Env -> Expr -> Val
 eval e (Var vn)            = envLookup e vn
 eval e (App t1 t2)         = case eval e t1 of 
-                                Fun x t1b   -> eval ((x, eval e t2):e) t1b
+                                Closure x t1b e2 -> eval ((x, eval e t2):e2) t1b
                                 _           -> error "Expected fn to be applied"
-eval e (Abstr x t)         = Fun x t
+eval e (Abstr x t)         = Closure x t e
 eval e (Let n t1 t2)       = eval ((n, eval e t1):e) t2
 eval e (Add t1 t2)         = case (eval e t1, eval e t2) of
                                 (Con i1, Con i2)    -> Con (i1 + i2)
                                 _                   -> Plus (eval e t1) (eval e t2)
 eval e (LetRec n t1 t2)    = case eval e t1 of
-                                Fun _ _     -> eval ((n, eval e $ App ycomb (Abstr n t1)):e) t2
+                                Closure _ _ _   -> eval ((n, eval e $ App ycomb (Abstr n t1)):e) t2
                                                     -- fn = fix (\fn.t1)
                                 _           -> error "Expected fn to be letrecced"
 eval e (Value v)            = v
@@ -73,8 +75,12 @@ eval e (Tail t)             = case eval e t of
                                 (Cons _ tail)           -> tail
                                 _                       -> error ("not a list " ++ show t)
 eval e (Case tc ps)   = patternMatchEval e tc ps
+eval e (ConsE t1 t2)  = Cons (valEvalInt $ eval e t1) (eval e t2)
 eval e _              = error "Feature not implemented"
 
+valEvalInt :: Val -> Int
+valEvalInt (Con t)  = t
+valEvalInt _        = error "Expected integer"
 
 -- Match all alternatives vs Expr
 patternMatchEval :: Env -> Expr -> Alts -> Val 
@@ -110,9 +116,10 @@ pp (App e1 e2)  = pp e1 ++ " " ++ pp e2
 pp (Abstr n e)  = "\\" ++ n ++ ".(" ++ pp e ++ ")"
 pp (Value v)    = ppVal v
 pp (Let n e1 e2)= "Let " ++ n ++ " = (" ++ pp e1 ++ ") in " ++ pp e2
-pp (Case e a)   = "Case " ++ pp e ++ " of " ++ ppMatch a
-pp (LetRec  n e1 e2)    = "Letrec " ++ n ++ " = (" ++ pp e1 ++ ") in " ++ pp e2
+pp (Case e a)   = "Case " ++ pp e ++ " of {" ++ ppMatch a ++ "\n}"
+pp (LetRec  n e1 e2)    = "Letrec " ++ n ++ " = (" ++ pp e1 ++ ")\nin " ++ pp e2
 pp (Add e1 e2)  = "(" ++ pp e1 ++ " + " ++ pp e2 ++ ")"
+pp (ConsE e1 e2) = "(" ++ pp e1 ++ " ++ " ++ pp e2 ++ ")"
 pp _            = "Error"
 
 ppMatch :: Alts -> String
@@ -127,9 +134,9 @@ ppPattern (PEllipsis n1 n2) = "(" ++ n1 ++ " ... " ++ n2 ++ ")"
 
 ppVal :: Val -> String
 ppVal (Con i)       = show i
-ppVal (Cons i v)    = show i ++ ppVal v
+ppVal (Cons i v)    = show i ++ " " ++ ppVal v
 ppVal Empty       = "Empty"
-ppVal (Fun n e)     = "Function " ++ n ++ " : " ++ pp e
+ppVal (Closure n e _)   = "Function " ++ n ++ " : " ++ pp e
 ppVal (Plus v1 v2)  = ppVal v1 ++ " + " ++ ppVal v2
 ppVal (FreeVar n)   = n
 ppVal _             = "Error"
@@ -139,6 +146,7 @@ ppVal _             = "Error"
 ------------------------------------------------------------------------
 
 exList = Cons 1 $ Cons 2 $ Cons 3 $ Cons 4 $ Cons 5 Empty
+exList2 = Cons 8 $ Cons 14 $ Cons 32 $ Cons 0 $ Cons 4 Empty
 
 succ' :: Expr
 succ' = Abstr "x" $ Add (Var "x") (Value $ Con 1)
@@ -149,8 +157,17 @@ head' = Abstr "l" $ Case (Var "l") [(PVal Empty, Value Empty), (PCons "H" "T", V
 tail' :: Expr
 tail' = Abstr "l" $ Case (Var "l") [(PVal Empty, Value Empty), (PCons "H" "T", Var "T")]
 
+
 map' :: Expr
-map' = Value $ Con 1
+map' = Abstr "l" $ Abstr "f" $
+        LetRec "map" (Abstr "list" $ Abstr "fun" $ Case (Var "list")
+            [
+                (PVal Empty, Value Empty),
+                (PCons "x" "xs", ConsE (App (Var "fun") (Var "x")) (App (App (Var "map") (Var "xs")) (Var "fun")))
+            ])
+            -- in
+            (App (App (Var "map") (Var "l")) (Var "f"))
+
 
 fold' :: Expr
 fold' = Value $ Con 1
@@ -162,7 +179,23 @@ second' :: Expr
 second' = Value $ Con 1
 
 nth' :: Expr
-nth' = Value $ Con 1
+nth' = Abstr "l" $ Abstr "n" $ 
+            LetRec "nth" (Abstr "list" $ Abstr "cur" $ Case (Var "cur") 
+                [
+                    (PVal $ Con 0, Case (Var "list")
+                    [
+                        (PCons "x" "xs", Var "x"), 
+                        (PVal Empty, Value Empty),
+                        (PVar "_", Var "_")
+                    ]),
+                    (PVar "rem", Case (Var "list")
+                    [
+                        (PCons "x" "xs", App (App (Var "nth") (Var "xs")) (Add (Var "rem") (Value $ Con (-1)))),
+                        (PVal Empty, Value Empty),
+                        (PVar "_", Var "_")
+                    ])
+                ]
+            ) $ App (App (Var "nth")  (Var "l")) (Var "n")
 
 zip' :: Expr
 zip' = Value $ Con 1
@@ -170,14 +203,66 @@ zip' = Value $ Con 1
 find' :: Expr
 find' = Value $ Con 1
 
+sum' :: Expr
+sum' = Abstr "l" $ LetRec "sum" (Abstr "list" $ Case (Var "list") 
+    [
+        (PVal Empty, Value $ Con 0), 
+        (PCons "x" "xs", Add (Var "x") (App (Var "sum") (Var "xs")))
+    ]) 
+    -- in
+    (App (Var "sum") (Var "l"))
+
+sumNum' :: Expr
+sumNum' = Abstr "n" $ LetRec "sumNum" (Abstr "x" $ Case (Var "x") [(PVal $ Con 0, Value $ Con 0), (PVar "y", Add (Var "y") (App (Var "sumNum") (Add (Var "y") (Value $ Con (-1)))))]) $ App (Var "sumNum") (Var "n")
+
+sucEach' :: Expr
+sucEach' = Abstr "l" $ LetRec "sucEach" (Abstr "list" $ Case (Var "list")
+    [
+        (PVal Empty, Value Empty),
+        (PCons "x" "xs", ConsE (Add (Var "x") (Value $ Con 1)) (App (Var "sucEach") (Var "xs")))
+    ]
+    )
+    -- in
+    (App (Var "sucEach") (Var "l"))
+
+fst' :: Expr
+fst' = Abstr "a" $ Abstr "b" $ Var "a"
+
+snd' :: Expr
+snd' = Abstr "a" $ Abstr "b" $ Var "b"
+
+id' :: Expr
+id' = Abstr "l" (LetRec "id" (Abstr "list" $ Case (Var "list")
+    [
+        (PVal Empty, Value Empty),
+        (PCons "x" "xs", ConsE (Var "x") (App (Var "id") (Var "xs")))
+    ])
+    -- in
+    (App (Var "id") (Var "l")))
+
 printList :: [String] -> IO ()
 printList []    = print ""
 printList (x:xs)= do
+                    putStrLn "========="
                     putStrLn x
                     printList xs
 
 main :: IO ()
 main =
     do
-        let examples = [succ', head', tail', map', fold', reverse', second', nth', zip', find'] in
+        let examples = [succ', head', tail', map', fold', reverse', second', nth', zip', find', sum', sumNum'] in
             printList (map pp examples)
+        let examples2 = [sucEach'] in
+            printList (map pp examples2)
+
+testCase :: Expr -> Val -> Bool
+testCase t v = eval [] t == v
+
+test :: IO ()
+test =
+    do
+        print $ testCase (App (App fst' (Value $ Con 1)) (Value $ Con 2)) (Con 1)
+        print $ testCase (App (App snd' (Value $ Con 1)) (Value $ Con 2)) (Con 2)
+        print $ testCase (App (App nth' (Value exList)) (Value $ Con 2)) (Con 3)
+        print $ testCase (App sucEach' (Value exList)) (Cons 2 $ Cons 3 $ Cons 4 $ Cons 5 $ Cons 6 Empty)
+        print $ testCase (App id' (Value exList)) (exList)
