@@ -1,4 +1,39 @@
+Task list:
+(1) Add VCons and restate things in terms of VCons
+(2) Find more papers about extending capabilities of pattern matching
+(3) Start writing
+
+then
+(4) Start writing functions in terms of ellipsis
+
+
+
+Papers for lit review:
+
+Name                                                Link        Skimmed/Rating
+Pattern Matching with Abstract Data Types           [1]         3
+
+
+[1] https://www.cambridge.org/core/journals/journal-of-functional-programming/article/pattern-matching-with-abstract-data-types1/04DD26A0E6CA3A1E87E0E6AE8BC02EED?utm_campaign=shareaholic&utm_medium=copy_link&utm_source=bookmark
+
+
+Think of something beyond environment as pairs
+Write about it
+Write about my interpreter
+Active patterns, spj pattern guards and transformational patterns
+Papers about extending capabilities of pattern matching
+haskell.org, wiki page about pattern matching
+haskell specification? yes haskell report, jfp
+
+
+
+
+Step 1: 
+
+
 Added pretty printer. Now do examples.
+map and fold done, and a few more. Can't do zip with my types right now. Will need to change cons type if we're going to talk about
+stuff like matrices
 
 
 Evaluate: does it make sense to use them on the left hand, right hand in examples?

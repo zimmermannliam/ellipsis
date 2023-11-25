@@ -15,7 +15,7 @@ data Expr = Var Name
           | Fix Expr
           | Add Expr Expr
           | Tail Expr
-          | EllipsisE Expr Val Val -- For ym ... yn, Ellipsis y m n
+          | EllipsisE Expr Expr Expr -- For y1 ... yn: EllipsesE y 1 n
           | ConsE Expr Expr
           deriving (Eq, Show)
 
@@ -32,8 +32,11 @@ data Val = Con Int
 data Pattern = PCons Name Name
              | PVar Name
              | PVal Val
-             | PEllipsis Name Name -- For y1 ... yn, Ellipsis 
+             | PEllipsis Name Idx
              deriving (Eq, Show)
+
+data Idx = Place Int | End Name
+            deriving (Eq, Show)
 
 type Name = String
 
@@ -67,7 +70,7 @@ eval e (Add t1 t2)         = case (eval e t1, eval e t2) of
                                 (Con i1, Con i2)    -> Con (i1 + i2)
                                 _                   -> Plus (eval e t1) (eval e t2)
 eval e (LetRec n t1 t2)    = case eval e t1 of
-                                Closure _ _ _   -> eval ((n, eval e $ App ycomb (Abstr n t1)):e) t2
+                                Closure {}  -> eval ((n, eval e $ App ycomb (Abstr n t1)):e) t2
                                                     -- fn = fix (\fn.t1)
                                 _           -> error "Expected fn to be letrecced"
 eval e (Value v)            = v
@@ -115,11 +118,13 @@ pp (Var n)      = n
 pp (App e1 e2)  = pp e1 ++ " " ++ pp e2
 pp (Abstr n e)  = "\\" ++ n ++ ".(" ++ pp e ++ ")"
 pp (Value v)    = ppVal v
-pp (Let n e1 e2)= "Let " ++ n ++ " = (" ++ pp e1 ++ ") in " ++ pp e2
+pp (Let n e1 e2) = "Let " ++ n ++ " = (" ++ pp e1 ++ ") in " ++ pp e2
 pp (Case e a)   = "Case " ++ pp e ++ " of {" ++ ppMatch a ++ "\n}"
 pp (LetRec  n e1 e2)    = "Letrec " ++ n ++ " = (" ++ pp e1 ++ ")\nin " ++ pp e2
 pp (Add e1 e2)  = "(" ++ pp e1 ++ " + " ++ pp e2 ++ ")"
 pp (ConsE e1 e2) = "(" ++ pp e1 ++ " ++ " ++ pp e2 ++ ")"
+pp (EllipsisE n start end)  = strn ++ pp start ++ " ... " ++ strn ++ pp end
+                                where strn = pp n
 pp _            = "Error"
 
 ppMatch :: Alts -> String
@@ -130,7 +135,12 @@ ppPattern :: Pattern -> String
 ppPattern (PCons n1 n2) = "(" ++ n1 ++ ":" ++ n2 ++ ")"
 ppPattern (PVar n)      = n
 ppPattern (PVal v)      = ppVal v
-ppPattern (PEllipsis n1 n2) = "(" ++ n1 ++ " ... " ++ n2 ++ ")"
+ppPattern (PEllipsis n i) = strn ++ "1 ... " ++ strn ++ ppIdx i
+                        where strn = n
+
+ppIdx :: Idx -> String
+ppIdx (Place i)   = show i
+ppIdx (End n)     = n
 
 ppVal :: Val -> String
 ppVal (Con i)       = show i
@@ -157,26 +167,58 @@ head' = Abstr "l" $ Case (Var "l") [(PVal Empty, Value Empty), (PCons "H" "T", V
 tail' :: Expr
 tail' = Abstr "l" $ Case (Var "l") [(PVal Empty, Value Empty), (PCons "H" "T", Var "T")]
 
+add' :: Expr
+add' = Abstr "a" $ Abstr "b" $ Add (Var "a") (Var "b")
+
 
 map' :: Expr
 map' = Abstr "l" $ Abstr "f" $
         LetRec "map" (Abstr "list" $ Abstr "fun" $ Case (Var "list")
-            [
-                (PVal Empty, Value Empty),
-                (PCons "x" "xs", ConsE (App (Var "fun") (Var "x")) (App (App (Var "map") (Var "xs")) (Var "fun")))
-            ])
+        [
+            (PVal Empty, Value Empty),
+            (PCons "x" "xs", ConsE (App (Var "fun") (Var "x")) (App (App (Var "map") (Var "xs")) (Var "fun")))
+        ])
             -- in
             (App (App (Var "map") (Var "l")) (Var "f"))
 
 
 fold' :: Expr
-fold' = Value $ Con 1
+fold' = Abstr "l" $ Abstr "f" $
+        LetRec "fold" (Abstr "list" $ Abstr "fun" $ Case (Var "list")
+        [
+            (PCons "x" "xs", Case (Var "xs")
+            [
+                (PVal Empty, Var "x"),
+                (PVar "xs'",    App 
+                                (App (Var "fun") (Var "x")) 
+                                (App (App (Var "fold") (Var "xs")) (Var "fun"))
+                                )
+            ])
+        ])
+        -- in
+        (App (App (Var "fold") (Var "l")) (Var "f"))
 
+
+-- Need another operator, I think -- cat or snoc?
 reverse' :: Expr
 reverse' = Value $ Con 1
+{- 
+reverse' :: Expr
+reverse' = Abstr "l" $ 
+            LetRec "reverse" (Abstr "list" )
+            -}
 
 second' :: Expr
-second' = Value $ Con 1
+second' = Abstr "l" $ Case (Var "l")
+            [
+                (PCons "x" "xs", Case (Var "xs")
+                                 [ 
+                                    (PCons "y" "ys", Var "y"),
+                                    (PVal Empty, Value Empty)
+                                 ]),
+                (PVal Empty, Value Empty)
+            ]
+
 
 nth' :: Expr
 nth' = Abstr "l" $ Abstr "n" $ 
@@ -197,8 +239,19 @@ nth' = Abstr "l" $ Abstr "n" $
                 ]
             ) $ App (App (Var "nth")  (Var "l")) (Var "n")
 
+
+-- Can't do zip, type-wise. Need a value-list
 zip' :: Expr
 zip' = Value $ Con 1
+{-
+zip' :: Expr
+zip' = Abstr "l1" $ Abstr "l2" $ 
+            LetRec "zip" (Abstr "list1" $ Abstr "list2" $ Case (Var "list1")
+                [
+                    (PCons "x" "xs", ),
+                    (PVal Empty, Value Empty)
+                ]
+    -}
 
 find' :: Expr
 find' = Value $ Con 1
@@ -265,4 +318,5 @@ test =
         print $ testCase (App (App snd' (Value $ Con 1)) (Value $ Con 2)) (Con 2)
         print $ testCase (App (App nth' (Value exList)) (Value $ Con 2)) (Con 3)
         print $ testCase (App sucEach' (Value exList)) (Cons 2 $ Cons 3 $ Cons 4 $ Cons 5 $ Cons 6 Empty)
-        print $ testCase (App id' (Value exList)) (exList)
+        print $ testCase (App id' (Value exList)) exList
+        print $ testCase (App (App map' (Value exList2)) succ') (Cons 9 $ Cons 15 $ Cons 33 $ Cons 1 $ Cons 5 Empty)
