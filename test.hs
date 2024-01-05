@@ -20,13 +20,34 @@ zip' l1 l2 = case l1 of
                                 []      -> []
                 [] -> []
 
+
 exList1 :: [Int]
 exList1 = [1,2,3,4,5]
 
 exList2 :: [Int]
 exList2 = [11,12,13,14,15]
 
+
+delete' :: [Int] -> Int -> [Int]
+delete' l i = case i of
+                0 -> case l of
+                        (x:xs)  -> xs
+                        []      -> error "out of range"
+                j -> case l of
+                        (x:xs)  -> x : delete' xs (j-1)
+                        []      -> error "out of range"
+
+testCase' :: Int -> Int -> Int
+testCase' i j = case (i, j) of
+                (5, j) -> i + j
+                _      -> 0
+
 reverse' :: [Int] -> [Int]
 reverse' l = case l of
-                (x:xs)  -> reverse' xs ++ [x]
+                (x:xs)  -> reverse xs ++ [x]
                 []      -> []
+
+len' :: [Int] -> Int
+len' l = case l of
+            (x:xs)  -> 1 + len' xs
+            []      -> 0
