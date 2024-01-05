@@ -1,5 +1,6 @@
 import qualified Data.Text as Text
 import Data.Maybe
+import Debug.Trace
 
 ---------------------------------------------------------------------------------
 -- SYNTAX
@@ -48,8 +49,8 @@ data Idx    = IPlace Int
             deriving (Eq, Show)
 
 data Binding    = BVal Val 
-                | ListThunk Expr 
-                | LenThunk Expr
+                | ListFuture Name 
+                | LenFuture Name
                 deriving (Eq, Show)
 
 type Name = String
@@ -76,7 +77,7 @@ ycomb = Abstr "f" $
 
 -- Evaluate an Expression in an Environment into a Value
 eval :: Env -> Expr -> Val
-eval e (Var vn)            = evalBinding $ envLookup e vn
+eval e (Var vn)            = evalBinding (envLookup e vn) e
 eval e (App t1 t2)         = case eval e t1 of 
                                 Closure x t1b e2 -> eval ((x, BVal $ eval e t2):e2) t1b
                                 _           -> errorOut e "Expected fn to be applied"
@@ -139,12 +140,14 @@ patternMatch e t (PCons n ns, t2)         = case eval e t of
                                                 VCons x xs  -> Just $ eval ((n, BVal x):(ns,BVal xs):e) t2
                                                 _           -> Nothing
 patternMatch e t (PVar n, t2)             = Just $ eval ((n, BVal $ eval e t):e) t2 
-patternMatch e t (PEllipsis n i, t2)      = Just $ eval ([(n, ListThunk t), (n_idx, LenThunk t)] ++ e) t2
-                                            where n_idx = case i of
-                                                    (End n) -> n
-                                                    _       -> error "Tried to unpack a bad end idx for ellipsis pattern"
-
-patternMatch e t _                        = Nothing
+patternMatch e t (PEllipsis n i, t2)      = Just $ eval ([(n, ListFuture n_t), (n_idx, LenFuture n_t)] ++ e) t2
+                                            where   n_idx = case i of
+                                                        (End n) -> n
+                                                        _       -> error "Tried to unpack a bad end idx for ellipsis pattern"
+                                                    n_t = case t of
+                                                        (Var n) -> n
+                                                        _       -> error "Tried to unpack bad name-term for ellipsis pattern"
+-- patternMatch e t _                        = Nothing
 
 -- Find a variable in environment
 envLookup :: Env -> Name -> Binding
@@ -153,27 +156,30 @@ envLookup [] name                       = BVal $ FreeVar name
 envLookup ((env_name, env_val):xs) name = if name == env_name then env_val
                                           else envLookup xs name
 
-evalBinding :: Binding -> Val
-evalBinding (BVal v)        = v
-evalBinding (LenThunk e)    = Con $ getLen e
-    where 
-    getLen :: Expr -> Int
-    getLen (Cons x xs) = 1 + getLen xs
-    getLen (Value v)   = if v == Empty then 0 else error "Error getLen-ing final item in list"
-    getLen _           = error "Error getLen-ing list"
-
-evalBinding (ListThunk e)   = error "ListThunk not implemented"
+evalBinding :: Binding -> Env -> Val
+evalBinding (BVal v) e      = v
+evalBinding (LenFuture n) e  = Con $ getLen boundList
+    where   boundList :: Val
+            boundList = case envLookup e n of
+                BVal v  -> v
+                _       -> error "Tried to bind list without value"
+            getLen :: Val -> Int
+            getLen (VCons x xs) = 1 + getLen xs
+            getLen (ICons x xs) = 1 + getLen xs
+            getLen Empty        = 0
+            getLen term         = error ("getLen encountered bad var: " ++ show term)
+evalBinding (ListFuture n) e = VStr "ListFuture not implemented"
 
 pp :: Expr -> String
 pp (Var n)      = n
 pp (App e1 e2)  = pp e1 ++ " " ++ pp e2
 pp (Abstr n e)  = "\\" ++ n ++ ".(" ++ pp e ++ ")"
 pp (Value v)    = ppVal v
-pp (Let n e1 e2) = "Let " ++ n ++ " = (" ++ pp e1 ++ ") in " ++ pp e2
-pp (Case e a)   = "Case " ++ pp e ++ " of {" ++ ppMatch a ++ "\n}"
+pp (Let n e1 e2)        = "Let " ++ n ++ " = (" ++ pp e1 ++ ") in " ++ pp e2
+pp (Case e a)           = "Case " ++ pp e ++ " of {" ++ ppMatch a ++ "\n}"
 pp (LetRec  n e1 e2)    = "Letrec " ++ n ++ " = (" ++ pp e1 ++ ")\nin " ++ pp e2
-pp (Add e1 e2)  = "(" ++ pp e1 ++ " + " ++ pp e2 ++ ")"
-pp (Cons e1 e2) = "(" ++ pp e1 ++ " : " ++ pp e2 ++ ")"
+pp (Add e1 e2)          = "(" ++ pp e1 ++ " + " ++ pp e2 ++ ")"
+pp (Cons e1 e2)         = "(" ++ pp e1 ++ " : " ++ pp e2 ++ ")"
 pp (Ellipsis n start end)  = strn ++ ppIdx start ++ " ... " ++ strn ++ ppIdx end
                                 where strn = pp n
 pp (Pair t1 t2) = "(" ++ pp t1 ++ ", " ++ pp t2 ++ ")"
@@ -210,7 +216,7 @@ ppVal _             = "Error"
 ppEnv :: Env -> String
 ppEnv e     = "<\n" ++ ppEnv' e ++ ">"
     where
-    ppEnv' ((n,v):es)   = n ++ " <- " ++ ppVal (evalBinding v) ++ "\n"
+    ppEnv' ((n,v):es)   = n ++ " <- " ++ ppVal (evalBinding v e) ++ "\n"
     ppEnv' []           = ""
 
 ------------------------------------------------------------------------
@@ -220,6 +226,7 @@ ppEnv e     = "<\n" ++ ppEnv' e ++ ">"
 exList = ICons 1 $ ICons 2 $ ICons 3 $ ICons 4 $ ICons 5 Empty
 exList2 = ICons 8 $ ICons 14 $ ICons 32 $ ICons 0 $ ICons 4 Empty
 exList3 = ICons 100 $ ICons 200 $ ICons 300 $ ICons 0 Empty
+exListExpr = Cons (Value $ Con 1) $ Cons (Value $ Con 2) $ Cons (Value $ Con 3) $ Cons (Value $ Con 4) $ Cons (Value $ Con 5) (Value Empty)
 
 succ' :: Expr
 succ' = Abstr "x" $ Add (Var "x") (Value $ Con 1)
@@ -395,7 +402,7 @@ len' = Abstr "l" $ LetRec "len" (Abstr "list" $ Case (Var "list")
     (App (Var "len") (Var "l"))
 
 len2' :: Expr
-len2' = Abstr "l" $ Case (Var "list")
+len2' = Abstr "l" $ Case (Var "l")
     [
         (PEllipsis "x" (End "n"), Var "n")
     ]
