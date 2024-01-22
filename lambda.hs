@@ -1,6 +1,10 @@
-import qualified Data.Text as Text
-import Data.Maybe
 import Debug.Trace
+import Data.Maybe
+import Data.Generics.Schemes
+import Data.Generics
+import Data.Data
+
+{-# LANGUAGE DeriveDataTypeable #-}
 
 ---------------------------------------------------------------------------------
 -- SYNTAX
@@ -17,12 +21,14 @@ data Expr = Var Name
           | Add Expr Expr
           | Tail Expr
           | Ellipsis Expr Idx Idx -- For y1 ... yn: EllipsesE y 1 n
+          | Ellipsis' Expr Idx Idx Name
           | Cons Expr Expr
           | Cat Expr Expr
           | Error String
           | Report Expr
           | Pair Expr Expr
-          deriving (Eq, Show)
+          | ListElement Name Idx
+          deriving (Eq, Show, Data)
 
 data Val = Con Int 
           | ICons Int Val 
@@ -35,29 +41,27 @@ data Val = Con Int
           | FreeVar Name
           | VPair Val Val
           | VStr String
-         deriving (Eq, Show)
+         deriving (Eq, Show, Data)
 
 data Pattern = PCons Name Name
              | PVar Name
              | PVal Val
              | PEllipsis Name Idx
-             deriving (Eq, Show)
+             deriving (Eq, Show, Data)
 
 data Idx    = IPlace Int 
             | End Name 
             | EPlace Expr -- Must evaluate to an integer
-            deriving (Eq, Show)
+            deriving (Eq, Show, Data)
 
 data Binding    = BVal Val 
                 | ListFuture Name 
                 | LenFuture Name
-                deriving (Eq, Show)
+                deriving (Eq, Show, Data)
 
 type Name = String
 
 type Env = [(Name, Binding)]
-
-
 
 type Alts = [(Pattern, Expr)]
 
@@ -104,11 +108,60 @@ eval e (Cat t1 t2)    = let et1 = iconsToVCons $ eval e t1
                             (VCons _ _, Empty)     -> et1
                             (Empty, VCons _ _)     -> et2
                             _                      -> errorOut e "Tried to cat non-lists"
+eval e (ListElement n i)    = findListFutureElement e (envLookup e n) i
 eval e (Error s)      = errorOut e s
+eval e (Ellipsis' t ib ie n)   = evalEllipsis e t ib ie n
 eval e _              = errorOut e "Feature not implemented"
+
+evalEllipsis :: Env -> Expr -> Idx -> Idx -> Name -> Val
+evalEllipsis e t ib ie n = eval e $ listToCons $ realizedList
+    where realizedList = [ realizeComprehension n (IPlace i) t | i <- forIdx e ib ie ]
+
+forIdx :: Env -> Idx -> Idx -> [Int]
+forIdx e ib ie = fill (idxToInt e ib) (idxToInt e ie)
+
+idxToInt :: Env -> Idx -> Int
+idxToInt e (IPlace i)   = i
+idxToInt e (End n)      = valEvalInt $ eval e $ (Var n)
+idxToInt e (EPlace t)   = valEvalInt $ eval e t
+
+listToCons :: [Expr] -> Expr
+listToCons []       = Value Empty
+listToCons (t:ts)   = Cons t (listToCons ts)
+
+
+fill :: Int -> Int -> [Int]
+fill b e    = if b < e then [b .. e] else fillBack b e
+    where
+    fillBack :: Int -> Int -> [Int]
+    fillBack e b = if e >= b then [e] ++ fillBack (e - 1) b else []
+
+realizeComprehension :: Name -> Idx -> Expr -> Expr
+realizeComprehension n i t = everywhere (mkT $ replaceVarWithElement n i) t
+    where   replaceVarWithElement :: Name -> Idx -> Expr -> Expr
+            replaceVarWithElement n1 i (Var n2) = if n1 == n2 then ListElement n1 i else Var n2
+            replaceVarWithElement _ _ t         = t
+
+findListFutureElement :: Env -> Binding -> Idx -> Val
+findListFutureElement e (ListFuture n) i = findNthElement
+        (iconsToVCons $ evalBinding (envLookup e n) e) 
+        intIdx
+    where   findNthElement :: Val -> Int -> Val
+            findNthElement (VCons x xs) i    = if i == 1 then x else findNthElement xs (i - 1)
+            findNthElement Empty _          = error "ListElement: not long enough!"
+            findNthElement x _              = error ("ListElement: non-list element detected:" ++ show x)
+            intIdx = case i of
+                EPlace t    ->  valEvalInt $ eval e t
+                IPlace i    ->  i
+                End n       ->  valEvalInt $ eval e (Var n)
+
+findListFutureElement e _ _ = errorOut' e "Bad list future element search"
 
 errorOut :: Env -> String -> Val
 errorOut e s = error (s ++ "; Environment: " ++ ppEnv e)
+
+errorOut' :: Env -> String -> a
+errorOut' e s = error (s ++ "; Environment: " ++ ppEnv e)
 
 iconsToVCons :: Val -> Val
 iconsToVCons (ICons x xs)   = VCons (Con x) (iconsToVCons xs)
@@ -140,13 +193,15 @@ patternMatch e t (PCons n ns, t2)         = case eval e t of
                                                 VCons x xs  -> Just $ eval ((n, BVal x):(ns,BVal xs):e) t2
                                                 _           -> Nothing
 patternMatch e t (PVar n, t2)             = Just $ eval ((n, BVal $ eval e t):e) t2 
-patternMatch e t (PEllipsis n i, t2)      = Just $ eval ([(n, ListFuture n_t), (n_idx, LenFuture n_t)] ++ e) t2
-                                            where   n_idx = case i of
-                                                        (End n) -> n
-                                                        _       -> error "Tried to unpack a bad end idx for ellipsis pattern"
-                                                    n_t = case t of
-                                                        (Var n) -> n
-                                                        _       -> error "Tried to unpack bad name-term for ellipsis pattern"
+patternMatch e t (PEllipsis n i, t2)      = Just $ eval ([(n, ListFuture n_t), 
+                                                          (n_idx, LenFuture n_t)
+                                                         ] ++ e) t2
+                    where   n_idx = case i of
+                                (End n) -> n
+                                _       -> error "Tried to unpack a bad end idx for ellipsis pattern"
+                            n_t = case t of
+                                (Var n) -> n
+                                _       -> error "Tried to unpack bad name-term for ellipsis pattern"
 -- patternMatch e t _                        = Nothing
 
 -- Find a variable in environment
@@ -180,10 +235,13 @@ pp (Case e a)           = "Case " ++ pp e ++ " of {" ++ ppMatch a ++ "\n}"
 pp (LetRec  n e1 e2)    = "Letrec " ++ n ++ " = (" ++ pp e1 ++ ")\nin " ++ pp e2
 pp (Add e1 e2)          = "(" ++ pp e1 ++ " + " ++ pp e2 ++ ")"
 pp (Cons e1 e2)         = "(" ++ pp e1 ++ " : " ++ pp e2 ++ ")"
-pp (Ellipsis n start end)  = strn ++ ppIdx start ++ " ... " ++ strn ++ ppIdx end
+pp (Ellipsis n start end)   = strn ++ ppIdx start ++ " ... " ++ strn ++ ppIdx end
                                 where strn = pp n
+pp (Ellipsis' t start end _) = strt ++ ppIdx start ++ " ... " ++ strt ++ ppIdx end
+                                where strt = pp t
 pp (Pair t1 t2) = "(" ++ pp t1 ++ ", " ++ pp t2 ++ ")"
 pp (Cat t1 t2) = pp t1 ++ " ++ " ++ pp t2
+pp (ListElement n i) = n ++ "[" ++ ppIdx i ++ "]"
 pp _            = "Error -- cannot display expression"
 
 ppMatch :: Alts -> String
@@ -196,7 +254,6 @@ ppPattern (PVar n)      = n
 ppPattern (PVal v)      = ppVal v
 ppPattern (PEllipsis n i) = strn ++ "1 ... " ++ strn ++ ppIdx i
                         where strn = n
-
 ppIdx :: Idx -> String
 ppIdx (IPlace i)   = show i
 ppIdx (End n)     = n
@@ -216,7 +273,7 @@ ppVal _             = "Error"
 ppEnv :: Env -> String
 ppEnv e     = "<\n" ++ ppEnv' e ++ ">"
     where
-    ppEnv' ((n,v):es)   = n ++ " <- " ++ ppVal (evalBinding v e) ++ "\n"
+    ppEnv' ((n,v):es)   = n ++ " <- " ++ show v ++ "\n" ++ ppEnv' es
     ppEnv' []           = ""
 
 ------------------------------------------------------------------------
@@ -239,6 +296,12 @@ tail' = Abstr "l" $ Case (Var "l") [(PVal Empty, Value Empty), (PCons "H" "T", V
 
 tail2' :: Expr
 tail2' = Abstr "l" $ Case (Var "l") [(PEllipsis "x" (End "n"), Ellipsis (Var "x") (IPlace 2) (End "n"))]
+
+tail3' :: Expr
+tail3' = Abstr "l" $ Case (Var "l") -- of
+    [
+        (PEllipsis "x" (End "n"), Ellipsis' (Var "x") (IPlace 2) (End "n") "x")
+    ]
 
 removeNth' :: Expr
 removeNth' = Abstr "l" $ Abstr "i" $ 
@@ -275,6 +338,16 @@ removeNth2' = Abstr "l" $ Abstr "n" $
                 )
         ]
 
+removeNth3' :: Expr
+removeNth3' = Abstr "l" $ Abstr "n" $
+    Case (Var "l") -- of
+    [
+        (PEllipsis "x" (End "m"), Cat
+            (Ellipsis' (Var "x") (IPlace 1) (EPlace $ Add (Var "n") (Value $ Con (-1))) "x")
+            (Ellipsis' (Var "x") (EPlace $ Add (Var "n") (Value $ Con 1)) (End "m") "X")
+            )
+    ]
+
 add' :: Expr
 add' = Abstr "a" $ Abstr "b" $ Add (Var "a") (Var "b")
 
@@ -283,6 +356,12 @@ map2' = Abstr "l" $ Abstr "f" $ Case (Var "l") -- of
         [
             (PEllipsis "x" (End "n"), Ellipsis (App (Var "f") (Var "x")) (IPlace 1) (End "n"))
         ]
+
+map3' :: Expr
+map3' = Abstr "l" $ Abstr "f" $ Case (Var "l") -- of
+    [
+        (PEllipsis "x" (End "n"), Ellipsis' (App (Var "f") (Var "x")) (IPlace 1) (End "n") "x")
+    ]
 
 map' :: Expr
 map' = Abstr "l" $ Abstr "f" $
@@ -312,7 +391,6 @@ fold' = Abstr "l" $ Abstr "f" $
         (App (App (Var "fold") (Var "l")) (Var "f"))
 
 
--- Need another operator, I think -- cat or snoc?
 reverse' :: Expr
 reverse'    = Abstr "l" $ LetRec "reverse"
             ( Abstr "list" $ Case (Var "list")
@@ -361,6 +439,12 @@ nth' = Abstr "l" $ Abstr "n" $
                 ]
             ) $ App (App (Var "nth")  (Var "l")) (Var "n")
 
+nth2' :: Expr
+nth2' = Abstr "l" $ Abstr "n" $ Case (Var "l")
+        -- of
+        [
+            (PEllipsis "x" (End "m"), ListElement "x" (EPlace $ Var "n"))
+        ]
 
 -- Can't do zip, type-wise. Need a value-list
 zip' :: Expr
