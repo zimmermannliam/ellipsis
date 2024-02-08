@@ -714,32 +714,3 @@ test3' = Abstr "l" $ Case (Var "l") -- of
         (PEllipsis "x" (End "n"), Ellipsis' (Var "x") (IPlace 3) (IPlace (-1)) "x")
     ]
 
-printList :: [String] -> IO ()
-printList []    = print ""
-printList (x:xs)= do
-                    putStrLn "========="
-                    putStrLn x
-                    printList xs
-
-main :: IO ()
-main =
-    do
-        let examples = [succ', head', tail', map', fold', reverse', second', nth', zip', find', sum', sumNum'] in
-            printList (map pp examples)
-        let examples2 = [sucEach'] in
-            printList (map pp examples2)
-
-testCase :: Expr -> Val -> Bool
-testCase t v = eval [] t == v
-
-test :: IO ()
-test = print "hi"
-{-
-    do
-        print $ testCase (App (App fst' (Value $ Con 1)) (Value $ Con 2)) (Con 1)
-        print $ testCase (App (App snd' (Value $ Con 1)) (Value $ Con 2)) (Con 2)
-        print $ testCase (App (App nth' (Value exList)) (Value $ Con 2)) (Con 3)
-        print $ testCase (App sucEach' (Value exList)) (ICons 2 $ ICons 3 $ ICons 4 $ ICons 5 $ ICons 6 Empty)
-        print $ testCase (App id' (Value exList)) exList
-        print $ testCase (App (App map' (Value exList2)) succ') (ICons 9 $ ICons 15 $ ICons 33 $ ICons 1 $ ICons 5 Empty)
-        -}
