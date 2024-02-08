@@ -1,3 +1,124 @@
+{-
+\l.case l of
+x1 ... xn -> e
+
+f = \l.case l of
+    x1 ... xn -> x2
+
+f E[2,3,4,5,6]
+
+[(l=V[2,3,4,5,6]),
+ (x=l),
+ (n=5)      -- bind the length of the list because we're evaluating it anyways
+ ]
+ -}
+
+Writeup:
+
+In the extended lambda calculus, we have the concept of a pattern/case, similar to haskell.
+
+succList = \l.(letrec succList' = \list.case list of
+    []      -> []
+    (x:xs)  -> (x+1:succList xs)
+
+The idea is to extend these patterns with ellipsis
+
+succList = \l.case l of
+    x1 ... xn   -> x1 + 1 ... xn + 1
+
+
+
+This might actually be better in an array-access language like Rust. Wouldn't that be cool!
+
+
+
+The problem here is that it's actually nlogn lol
+binSearch (x1 ... xn) t     = if x[n/2] == t then     n/2
+                              else if x[n/2] > t then binSearch (x1 ... x[n/2-1]) t
+                              else                    binSearch (x[n/2+1] ... xn) t
+
+
+
+sort :: [Int] -> [Int]
+sort []        = []
+sort [x]       = [x]
+sort x1 ... xn = merge (sort x1 ... x[n/2]) (sort x[n/2+1] ... xn)
+
+merge :: [Int] -> [Int] -> [Int]
+merge xs [] = xs
+merge [] ys = ys
+merge (x:xs) (y:ys)     = if x <= y then (x:merge xs (y:ys))
+                          else (y:merge (x:xs) ys)
+
+merge (x1 ... xn) (y1 ... yn)   = 
+
+
+Todo:
+explain my semantics in easier format for review
+smart constructor -- Case vs case -- 
+Case can only match on variables so make it variable only (name)
+
+matrices using nested lists
+
+swapFirstAndLast
+x1 ... xn -> xn x2 ... x(n-1) x1
+
+Sorting algorithms, merge sort
+
+x1 ... xn -> (x1, xn) ... (xn, x1)
+
+(x1, xn) (x2, xn-1) ... (
+if I have examples that would right but can't be expressed, why? Where does the limitation come from? Could ellipsis be extended to work on this example?
+How does the ellipsis notation cooperate with other list functions?
+
+
+\l.map f $ reverse l
+
+versus
+
+\l.case l of
+x1 ... xn -> f xn ... f x1
+
+x1 ... xn -> (x1, x2) ... (xn-1, xn)
+closest neighbors aux function
+
+zip
+
+Functions that work:
+map
+tail
+removeNth, sort of... I just messed it up
+firstN
+reverse
+nth
+len
+
+report on standard ml
+match rules
+turn haskell fns into operational semantics
+note the mono font for concrete syntax
+check 381 notes
+
+
+explain in thesis
+
+show concrete syntax, 
+
+Alts = rules
+
+Error checking, things like bounds checking should be pretty robust
+
+for example in removenth, relationship between m and n -- n <= m
+when is the function well defined, when does it lead to an error? Can we add anything to define the funciton better? Is there a loss of completeness?
+
+
+There are two ways this feature can be evaluat3ed: As an explanation of core functions (like above), or as a replacement of more
+complex functions (like if there's a function that does something like "firstN $ map $ removeNth $ ..."
+smart constructors
+
+
+
+what did you do with mike bailey? I saw a file called erwig.glib during a lecture
 
 The Egison paper is very similar to mine. I should figure out how they use the ellipsis pattern in their langauge, and if I need to
 make mine different or unique in some way.
@@ -10,7 +131,8 @@ Task list:
 then
 (4) Start writing functions in terms of ellipsis
 
-
+completeness checkers for patterns, should be a related work -- and how complete is my pattern, and how complete can I make it?
+What is the reciprocal pattern? What would an error/warning look like wrt removeN
 
 Papers for lit review:
                                                                 Skim

@@ -19,6 +19,10 @@ data Expr = Var Name
           | LetRec Name Expr Expr -- LetRec "Name" = Expr in Expr
           | Fix Expr
           | Add Expr Expr
+          | Sub Expr Expr
+          | Mul Expr Expr
+          | Div Expr Expr
+          | Abs Expr
           | Tail Expr
           | Ellipsis Expr Idx Idx -- For y1 ... yn: EllipsesE y 1 n
           | Ellipsis' Expr Idx Idx Name
@@ -28,6 +32,7 @@ data Expr = Var Name
           | Report Expr
           | Pair Expr Expr
           | ListElement Name Idx
+          | Trace String Expr Expr
           deriving (Eq, Show, Data)
 
 data Val = Con Int 
@@ -46,18 +51,26 @@ data Val = Con Int
 data Pattern = PCons Name Name
              | PVar Name
              | PVal Val
-             | PEllipsis Name Idx
+             | PEllipsis Name Idx -- x1 ... xn -> x2 ... xn
              deriving (Eq, Show, Data)
 
-data Idx    = IPlace Int 
+data Idx    = IPlace Int        -- Reflect work they're doing -- 
             | End Name 
             | EPlace Expr -- Must evaluate to an integer
             deriving (Eq, Show, Data)
 
+-- Bindee?
 data Binding    = BVal Val 
                 | ListFuture Name 
                 | LenFuture Name
                 deriving (Eq, Show, Data)
+
+-- create an iterator
+-- 
+
+-- \l. case l of
+-- x1 ... xn --> [("l", a list), ("x", ListFuture "l"), ("n", LenFuture "l")]
+-- 
 
 type Name = String
 
@@ -89,7 +102,19 @@ eval e (Abstr x t)         = Closure x t e
 eval e (Let n t1 t2)       = eval ((n, BVal $ eval e t1):e) t2
 eval e (Add t1 t2)         = case (eval e t1, eval e t2) of
                                 (Con i1, Con i2)    -> Con (i1 + i2)
-                                _                   -> Plus (eval e t1) (eval e t2)
+                                _                   -> errorOut' e "Bad add terms" 
+eval e (Sub t1 t2)         = case (eval e t1, eval e t2) of
+                                (Con i1, Con i2)    -> Con (i1 - i2)
+                                _                   -> errorOut' e "Bad sub terms" 
+eval e (Mul t1 t2)          = case (eval e t1, eval e t2) of
+                                (Con i1, Con i2)    -> Con (i1 * i2)
+                                _                   -> errorOut' e "Bad mul terms"
+eval e (Div t1 t2)          = case (eval e t1, eval e t2) of
+                                (Con i1, Con i2)    -> Con (i1 `div` i2)
+                                _                   -> errorOut' e "Bad div terms"
+eval e (Abs t)              = case eval e t of
+                                (Con i)             -> Con (abs i)
+                                _                   -> errorOut' e "Bad abs term"
 eval e (LetRec n t1 t2)    = case eval e t1 of
                                 Closure {}  -> eval ((n, BVal $ eval e $ App ycomb (Abstr n t1)):e) t2
                                                     -- fn = fix (\fn.t1)
@@ -110,25 +135,65 @@ eval e (Cat t1 t2)    = let et1 = iconsToVCons $ eval e t1
                             _                      -> errorOut e "Tried to cat non-lists"
 eval e (ListElement n i)    = findListFutureElement e (envLookup e n) i
 eval e (Error s)      = errorOut e s
-eval e (Ellipsis' t ib ie n)   = evalEllipsis e t ib ie n
-eval e _              = errorOut e "Feature not implemented"
+eval e (Ellipsis' t ib ie vn) =
+    let list = evalBinding (envLookup e vn) e
+    in evalEllipsis e list t vn ib ie
+eval e (Trace s tt t)        = trace (s ++ ": " ++ ppVal (eval e tt)) $ eval e t
+eval e x              = errorOut e $ "Feature not implemented: " ++ show x
 
-evalEllipsis :: Env -> Expr -> Idx -> Idx -> Name -> Val
-evalEllipsis e t ib ie n = eval e $ listToCons $ realizedList
+evalEllipsis' :: Env -> Expr -> Idx -> Idx -> Name -> Val
+evalEllipsis' e t ib ie n = eval e $ listToCons realizedList
     where realizedList = [ realizeComprehension n (IPlace i) t | i <- forIdx e ib ie ]
+
+evalEllipsis :: Env -> Val -> Expr -> Name -> Idx -> Idx -> Val
+evalEllipsis e l t n ib ie = 
+    let ib'     = idxToInt e ib
+        ie'     = idxToInt e ie
+        range   = ie' - ib'
+        l'      = if range < 0 then reverseCons l else l
+        ib''    = if range < 0 then getLen l' - ib' + 1 else ib'
+        l''     = startingAtNthCons l' ib''
+    in 
+    if ie' < 1 then Empty
+    else iterateCons e l'' t n (abs range + 1)
+
+reverseCons :: Val -> Val
+reverseCons l = eval [] $ cons [1,2,3] -- reverseCons' l
+    where
+    reverseCons' :: Val -> [Val]
+    reverseCons' (VCons x xs)    = reverseCons' xs ++ [x]
+    reverseCons' (Empty)  = []
+
+startingAtNthCons :: Val -> Int -> Val
+startingAtNthCons l 1            = l
+startingAtNthCons (VCons x xs) i  = startingAtNthCons xs (i - 1)
+startingAtNthCons Empty _        = Empty
+startingAtNthCons l i            = error $ "startingAtNthCons unexpected values: l=" ++ show l ++ "i = " ++ show i
+
+iterateCons :: Env -> Val -> Expr -> String -> Int -> Val
+iterateCons _ _ _ _ 0     = Empty
+iterateCons e (Empty) _ _ i = Empty -- errorOut e $ "Empty too soon; i: " ++ show i
+iterateCons e (VCons x xs) t n i   = VCons (eval e $ replaceVar n x t) (iterateCons e xs t n (i-1))
+iterateCons e _ _ _ _     = errorOut' e "Non-cons somehow in iterator"
+
+replaceVar :: String -> Val -> Expr -> Expr
+replaceVar n valin tout = everywhere (mkT $ replaceVar' n valin) tout
+
+replaceVar' :: String -> Val -> Expr -> Expr
+replaceVar' n valin (Var n')  = if n == n' then Value valin else Var n'
+replaceVar' _ _ t           = t
 
 forIdx :: Env -> Idx -> Idx -> [Int]
 forIdx e ib ie = fill (idxToInt e ib) (idxToInt e ie)
 
 idxToInt :: Env -> Idx -> Int
 idxToInt e (IPlace i)   = i
-idxToInt e (End n)      = valEvalInt $ eval e $ (Var n)
+idxToInt e (End n)      = valEvalInt $ eval e (Var n)
 idxToInt e (EPlace t)   = valEvalInt $ eval e t
 
 listToCons :: [Expr] -> Expr
 listToCons []       = Value Empty
 listToCons (t:ts)   = Cons t (listToCons ts)
-
 
 fill :: Int -> Int -> [Int]
 fill b e    = if b < e then [b .. e] else fillBack b e
@@ -147,8 +212,15 @@ findListFutureElement e (ListFuture n) i = findNthElement
         (iconsToVCons $ evalBinding (envLookup e n) e) 
         intIdx
     where   findNthElement :: Val -> Int -> Val
-            findNthElement (VCons x xs) i    = if i == 1 then x else findNthElement xs (i - 1)
-            findNthElement Empty _          = error "ListElement: not long enough!"
+            findNthElement (VCons x xs) i    =  if i == 1 
+                                                    then x 
+                                                else if i > 0
+                                                    then findNthElement xs (i - 1)
+                                                else if i == 0
+                                                    then Empty
+                                                else
+                                                    error $ "ListElement: bad i: " ++ show i
+            findNthElement Empty i          = error $ "ListElement: not long enough! i: " ++ show i
             findNthElement x _              = error ("ListElement: non-list element detected:" ++ show x)
             intIdx = case i of
                 EPlace t    ->  valEvalInt $ eval e t
@@ -210,6 +282,11 @@ envLookup [] name                       = BVal $ FreeVar name
                                         --error $ "envLookup: can't find " ++ name ++ " in env"
 envLookup ((env_name, env_val):xs) name = if name == env_name then env_val
                                           else envLookup xs name
+getLen :: Val -> Int
+getLen (VCons x xs) = 1 + getLen xs
+getLen (ICons x xs) = 1 + getLen xs
+getLen Empty        = 0
+getLen term         = error ("getLen encountered bad var: " ++ show term)
 
 evalBinding :: Binding -> Env -> Val
 evalBinding (BVal v) e      = v
@@ -218,12 +295,7 @@ evalBinding (LenFuture n) e  = Con $ getLen boundList
             boundList = case envLookup e n of
                 BVal v  -> v
                 _       -> error "Tried to bind list without value"
-            getLen :: Val -> Int
-            getLen (VCons x xs) = 1 + getLen xs
-            getLen (ICons x xs) = 1 + getLen xs
-            getLen Empty        = 0
-            getLen term         = error ("getLen encountered bad var: " ++ show term)
-evalBinding (ListFuture n) e = VStr "ListFuture not implemented"
+evalBinding (ListFuture n) e = evalBinding (envLookup e n) e
 
 pp :: Expr -> String
 pp (Var n)      = n
@@ -233,7 +305,6 @@ pp (Value v)    = ppVal v
 pp (Let n e1 e2)        = "Let " ++ n ++ " = (" ++ pp e1 ++ ") in " ++ pp e2
 pp (Case e a)           = "Case " ++ pp e ++ " of {" ++ ppMatch a ++ "\n}"
 pp (LetRec  n e1 e2)    = "Letrec " ++ n ++ " = (" ++ pp e1 ++ ")\nin " ++ pp e2
-pp (Add e1 e2)          = "(" ++ pp e1 ++ " + " ++ pp e2 ++ ")"
 pp (Cons e1 e2)         = "(" ++ pp e1 ++ " : " ++ pp e2 ++ ")"
 pp (Ellipsis n start end)   = strn ++ ppIdx start ++ " ... " ++ strn ++ ppIdx end
                                 where strn = pp n
@@ -242,11 +313,17 @@ pp (Ellipsis' t start end _) = strt ++ ppIdx start ++ " ... " ++ strt ++ ppIdx e
 pp (Pair t1 t2) = "(" ++ pp t1 ++ ", " ++ pp t2 ++ ")"
 pp (Cat t1 t2) = pp t1 ++ " ++ " ++ pp t2
 pp (ListElement n i) = n ++ "[" ++ ppIdx i ++ "]"
+pp (Add e1 e2)          = pp e1 ++ "+" ++ pp e2
+pp (Sub t1 t2)          = pp t1 ++ "-" ++ pp t2
+pp (Mul t1 t2)          = pp t1 ++ "*" ++ pp t2
+pp (Div t1 t2)          = pp t1 ++ "/" ++ pp t2
+pp (Abs t)              = "|" ++ pp t ++ "|"
+pp (Trace _ _ t)        = pp t
 pp _            = "Error -- cannot display expression"
 
 ppMatch :: Alts -> String
 ppMatch []              = ""
-ppMatch ((p, e):as)     = "\n\t" ++ ppPattern p ++ " = " ++ pp e ++ ppMatch as
+ppMatch ((p, e):as)     = "\n\t" ++ ppPattern p ++ " -> " ++ pp e ++ ppMatch as
 
 ppPattern :: Pattern -> String
 ppPattern (PCons n1 n2) = "(" ++ n1 ++ ":" ++ n2 ++ ")"
@@ -280,10 +357,37 @@ ppEnv e     = "<\n" ++ ppEnv' e ++ ">"
 -- EXAMPLES
 ------------------------------------------------------------------------
 
-exList = ICons 1 $ ICons 2 $ ICons 3 $ ICons 4 $ ICons 5 Empty
-exList2 = ICons 8 $ ICons 14 $ ICons 32 $ ICons 0 $ ICons 4 Empty
-exList3 = ICons 100 $ ICons 200 $ ICons 300 $ ICons 0 Empty
-exListExpr = Cons (Value $ Con 1) $ Cons (Value $ Con 2) $ Cons (Value $ Con 3) $ Cons (Value $ Con 4) $ Cons (Value $ Con 5) (Value Empty)
+-- SMART CONSTRUCTORS
+[f,x,n,l,r,m,k,t,y] = map Var ["f","x","n","l","r","m","k","t","y"]
+
+con :: Int -> Expr
+con i = Value $ Con i
+
+cons :: [Int] -> Expr
+cons l = foldr1 Cons ((map con l) ++ [Value Empty]) 
+
+exList' = [1..5]
+exList2' = [8,14,32,0,4]
+exList3' = [1,2,13,24,25,45,64,84,99,100]
+exList4' = [1..10]
+
+myCons = map cons [exList', exList2', exList3', exList4']
+[exList, exList2, exList3, exList4] = myCons
+[exListV, exList2V, exList3V, exList4V] = map (eval prelude) myCons
+
+-- PRELUDE FUNCTIONS
+prelude :: Env
+prelude = [("cmp", BVal $ eval [] $ cmp')]
+[cmp] = map Var ["cmp"]
+
+cmp' :: Expr
+cmp' = Abstr "l" $ Abstr "r" $ Case (Sub l r) -- of
+    [
+        (PVal $ Con 0, Value $ Con 0),
+        (PVar "x", Div x (Abs x))
+    ]
+
+
 
 succ' :: Expr
 succ' = Abstr "x" $ Add (Var "x") (Value $ Con 1)
@@ -343,9 +447,16 @@ removeNth3' = Abstr "l" $ Abstr "n" $
     Case (Var "l") -- of
     [
         (PEllipsis "x" (End "m"), Cat
-            (Ellipsis' (Var "x") (IPlace 1) (EPlace $ Add (Var "n") (Value $ Con (-1))) "x")
-            (Ellipsis' (Var "x") (EPlace $ Add (Var "n") (Value $ Con 1)) (End "m") "X")
+            (Ellipsis' (Var "x") (IPlace 1) (EPlace $ Sub (Var "n") (Value $ Con (1))) "x")
+            (Ellipsis' (Var "x") (EPlace $ Add (Var "n") (Value $ Con 1)) (End "m") "x")
             )
+    ]
+
+firstN :: Expr
+firstN = Abstr "l" $ Abstr "n" $
+    Case (Var "l") -- of
+    [
+        (PEllipsis "x" (End "m"),   Ellipsis' (Var "x") (IPlace 1) (EPlace $ Var "n") "x")
     ]
 
 add' :: Expr
@@ -357,11 +468,21 @@ map2' = Abstr "l" $ Abstr "f" $ Case (Var "l") -- of
             (PEllipsis "x" (End "n"), Ellipsis (App (Var "f") (Var "x")) (IPlace 1) (End "n"))
         ]
 
+
+
 map3' :: Expr
-map3' = Abstr "l" $ Abstr "f" $ Case (Var "l") -- of
+map3' = Abstr "l" $ Abstr "f" $ Case l -- of
     [
-        (PEllipsis "x" (End "n"), Ellipsis' (App (Var "f") (Var "x")) (IPlace 1) (End "n") "x")
+        (PEllipsis "x" (End "n"), Ellipsis' (App f x) (IPlace 1) (End "n") "x")
     ]
+
+-- x1 ... xn -> (f x1) ... (f xn)
+
+-- (x1 ... xn, y1 ... ym)  -> let k = min m n in (x1, y1) ... (xk, yk)
+-- Ellipsis' . . . [Name]
+
+-- \l.case l of (x1 ... xn) -> \l2.case l2 of (y1 ... ym) -> let k = min m n in (x1, y1) ... (xk, yk)
+
 
 map' :: Expr
 map' = Abstr "l" $ Abstr "f" $
@@ -408,6 +529,12 @@ reverse2' = Abstr "l" $ Case (Var "l")
                 (PEllipsis "x" (End "n"),     Ellipsis (Var "x") (End "n") (IPlace 1))
             ]
 
+reverse3' :: Expr
+reverse3' = Abstr "l" $ Case (Var "l") -- of
+    [
+        (PEllipsis "x" (End "n"),   Ellipsis' (Var "x") (End "n") (IPlace 1) "x")
+    ]
+
 second' :: Expr
 second' = Abstr "l" $ Case (Var "l")
             [
@@ -418,6 +545,12 @@ second' = Abstr "l" $ Case (Var "l")
                                  ]),
                 (PVal Empty, Value Empty)
             ]
+
+second2' :: Expr
+second2' = Abstr "l" $ Case (Var "l") -- of
+    [
+        (PEllipsis "x" (End "n"), ListElement "x" (IPlace 2))
+    ]
 
 
 nth' :: Expr
@@ -519,6 +652,68 @@ id' = Abstr "l" (LetRec "id" (Abstr "list" $ Case (Var "list")
     -- in
     (App (Var "id") (Var "l")))
 
+
+split' :: Expr
+split' = Abstr "l" $ Case l -- of
+    [
+        (PEllipsis "x" (End "n"), Pair 
+                            (Ellipsis' x (IPlace 1) (EPlace $ Div (Var "n") (Value $ Con 2)) "x")
+                            (Ellipsis' x (EPlace $ Add (Div (Var "n") (Value $ Con 2)) (Value $ Con 1)) (EPlace $ Var "n") "x"))
+    ]
+
+listId' :: Expr
+listId' = Abstr "l" $ Case (Var "l") -- of
+    [
+        (PEllipsis "x" (End "n"),   Ellipsis' (Var "x") (IPlace 1) (End "n") "x")
+    ]
+
+binSearch' :: Expr
+binSearch' = Abstr "list" $ Abstr "term" $ (LetRec "binSearch" (Abstr "l" $ Abstr "t" $ Case (Var "l") -- of
+    [
+        (PVal Empty,    Value $ Con 0),
+        (PEllipsis "x" (End "n"),     Trace "l" l $ Trace "n" n $ Let "k" (Add (Div n (Value $ Con 2)) (Value $ Con 1)) $ 
+            Case (App (App cmp (ListElement "x" (EPlace k))) t)
+            [
+                (PVal $ Con 0,    Value $ Con 1),
+                (PVal $ Con 1, App (App (Var "binSearch") $ (Ellipsis' x 
+                                                                        (IPlace 1) 
+                                                                        (EPlace $ Sub k (Value $ Con 1))
+                                                                        "x")) 
+                                                                        t),
+                (PVal $ Con (-1), App (App (Var "binSearch") $ (Ellipsis' x 
+                                                                        (EPlace $ Add k (Value $ Con 1)) 
+                                                                        (End "n")
+                                                                        "x"))
+                                                                        t)
+            ]
+        )
+    ]) -- in
+    (App (App (Var "binSearch") (Var "list")) (Var "term"))
+    )
+
+{-
+mergeSort' :: Expr
+mergeSort' = Abstr "l" $ LetRec "mergeSort" -- =
+    (Abstr "list" $ Case (Var "list") -- of
+    [
+        (PVal Empty, Value Empty),
+        (PEllipsis "x" (End "n"), 
+
+        )
+    ])
+    -- in
+    (App (Var "mergeSort") (Var "l"))
+
+merge' :: Expr
+merge = Abstr "l1" $ Abstr "l2"
+-}
+
+test3' :: Expr
+test3' = Abstr "l" $ Case (Var "l") -- of
+    [
+        (PEllipsis "x" (End "n"), Ellipsis' (Var "x") (IPlace 3) (IPlace (-1)) "x")
+    ]
+
 printList :: [String] -> IO ()
 printList []    = print ""
 printList (x:xs)= do
@@ -538,7 +733,8 @@ testCase :: Expr -> Val -> Bool
 testCase t v = eval [] t == v
 
 test :: IO ()
-test =
+test = print "hi"
+{-
     do
         print $ testCase (App (App fst' (Value $ Con 1)) (Value $ Con 2)) (Con 1)
         print $ testCase (App (App snd' (Value $ Con 1)) (Value $ Con 2)) (Con 2)
@@ -546,3 +742,4 @@ test =
         print $ testCase (App sucEach' (Value exList)) (ICons 2 $ ICons 3 $ ICons 4 $ ICons 5 $ ICons 6 Empty)
         print $ testCase (App id' (Value exList)) exList
         print $ testCase (App (App map' (Value exList2)) succ') (ICons 9 $ ICons 15 $ ICons 33 $ ICons 1 $ ICons 5 Empty)
+        -}
