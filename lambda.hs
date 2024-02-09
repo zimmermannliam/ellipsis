@@ -167,7 +167,7 @@ startingAtNthCons l i            = error $ "startingAtNthCons unexpected values:
 
 iterateCons :: Env -> Val -> Expr -> String -> Int -> Val
 iterateCons _ _ _ _ 0     = Empty
-iterateCons e Empty _ _ i = Empty -- errorOut e $ "Empty too soon; i: " ++ show i
+iterateCons e Empty _ _ i = errorOut e $ "Empty too soon; i: " ++ show i
 iterateCons e (VCons x xs) t n i   = VCons (eval e $ replaceVar n x t) (iterateCons e xs t n (i-1))
 iterateCons e _ _ _ _     = errorOut' e "Non-cons somehow in iterator"
 
