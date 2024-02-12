@@ -67,7 +67,7 @@ keepjumps 24
 normal! 0
 wincmd w
 argglobal
-terminal ++curwin ++cols=112 ++rows=49 ghci -XDeriveDataTypeable lambda.hs
+terminal ++close ++curwin ++cols=112 ++rows=49 ghci -XDeriveDataTypeable lambda.hs
 let s:term_buf_5 = bufnr()
 balt lambda.hs
 setlocal fdm=manual

@@ -32,6 +32,14 @@ data Expr = Var Name
           | Pair Expr Expr
           | ListElement Name Idx
           | Trace String Expr Expr
+          | Eq Expr Expr
+          | Lt Expr Expr
+          | Gt Expr Expr
+          | Leq Expr Expr
+          | Geq Expr Expr
+          | Or Expr Expr
+          | Not Expr
+          | And Expr Expr
           deriving (Eq, Show, Data)
 
 data Val = Con Int 
@@ -45,6 +53,7 @@ data Val = Con Int
           | FreeVar Name
           | VPair Val Val
           | VStr String
+          | Boolean Bool
          deriving (Eq, Show, Data)
 
 data Pattern = PCons Name Name
@@ -138,6 +147,28 @@ eval e (Ellipsis t ib ie vn) =
     let list = evalBinding (envLookup e vn) e
     in evalEllipsis e list t vn ib ie
 eval e (Trace s tt t)        = trace (s ++ ": " ++ ppVal (eval e tt)) $ eval e t
+eval e (Eq t1 t2)           = Boolean (eval e t1 == eval e t2)
+eval e (Lt t1 t2)           = case (eval e t1, eval e t2) of
+    (Con x1, Con x2)    -> Boolean $ x1 < x2
+    (v1, v2)            -> errorOut e $ "Tried to Lt two non-integers: " ++ show v1 ++ " < " ++ show v2
+eval e (Gt t1 t2)           = case (eval e t1, eval e t2) of
+    (Con x1, Con x2)    -> Boolean $ x1 > x2
+    (v1, v2)            -> errorOut e $ "Tried to Gt two non-integers: " ++ show v1 ++ " > " ++ show v2
+eval e (Leq t1 t2)          = case (eval e t1, eval e t2) of
+    (Con x1, Con x2)    -> Boolean $ x1 <= x2
+    (v1, v2)            -> errorOut e $ "Tried to Leq two non-integers: " ++ show v1 ++ " <= " ++ show v2
+eval e (Geq t1 t2)           = case (eval e t1, eval e t2) of
+    (Con x1, Con x2)    -> Boolean $ x1 >= x2
+    (v1, v2)            -> errorOut e $ "Tried to Geq two non-integers: " ++ show v1 ++ " >= " ++ show v2
+eval e (Or t1 t2)           = case (eval e t1, eval e t2) of
+    (Boolean b1, Boolean b2)    -> Boolean $ b1 || b2
+    (v1, v2)                    -> errorOut e $ "Tried to OR non-booleans: " ++ show v1 ++ " || " ++ show v2
+eval e (And t1 t2)           = case (eval e t1, eval e t2) of
+    (Boolean b1, Boolean b2)    -> Boolean $ b1 && b2
+    (v1, v2)                    -> errorOut e $ "Tried to AND non-booleans: " ++ show v1 ++ " && " ++ show v2
+eval e (Not t)               = case eval e t of
+    Boolean b   -> Boolean $ not b
+    v           -> errorOut e $ "Tried to NOT a non-boolean: " ++ show v
 eval e x              = errorOut e $ "Feature not implemented: " ++ show x
 
 evalEllipsis :: Env -> Val -> Expr -> Name -> Idx -> Idx -> Val
@@ -299,6 +330,18 @@ evalBinding (LenFuture n) e  = Con $ getLen boundList
                 _       -> error "Tried to bind list without value"
 evalBinding (ListFuture n) e = evalBinding (envLookup e n) e
 
+
+------------------------------------------------------------------------
+-- PARSE
+------------------------------------------------------------------------
+
+parse :: String -> Expr
+parse _ = Value Empty
+
+------------------------------------------------------------------------
+-- PRINT
+------------------------------------------------------------------------
+
 pp :: Expr -> String
 pp (Var n)      = n
 pp (App e1 e2)  = pp e1 ++ " " ++ pp e2
@@ -319,6 +362,14 @@ pp (Mul t1 t2)          = pp t1 ++ "*" ++ pp t2
 pp (Div t1 t2)          = pp t1 ++ "/" ++ pp t2
 pp (Abs t)              = "|" ++ pp t ++ "|"
 pp (Trace _ _ t)        = pp t
+pp (Eq t1 t2)           = pp t1 ++ " == " ++ pp t2
+pp (Lt t1 t2)           = pp t1 ++ " < " ++ pp t2
+pp (Gt t1 t2)           = pp t1 ++ " > " ++ pp t2
+pp (Leq t1 t2)          = pp t1 ++ " <= " ++ pp t2
+pp (Geq t1 t2)          = pp t1 ++ " >= " ++ pp t2
+pp (Or t1 t2)           = pp t1 ++ " || " ++ pp t2
+pp (And t1 t2)          = pp t1 ++ " && " ++ pp t2
+pp (Not t)              = "!(" ++ pp t ++ ")"
 pp _            = "Error -- cannot display expression"
 
 ppMatch :: Alts -> String
@@ -347,6 +398,7 @@ ppVal (Closure n e _)   = "Function " ++ n ++ " : " ++ pp e
 ppVal (Plus v1 v2)  = ppVal v1 ++ " + " ++ ppVal v2
 ppVal (FreeVar n)   = n
 ppVal (VPair v1 v2) = "(" ++ ppVal v1 ++ ", " ++ ppVal v2 ++ ")"
+ppVal (Boolean b)   = if b then "True" else "False"
 ppVal _             = "Error"
 
 ppEnv :: Env -> String
