@@ -10,51 +10,44 @@ import Data.Data
 -- SYNTAX
 ---------------------------------------------------------------------------------
 
-data Expr = Var Name
-          | App Expr Expr
-          | Abstr Name Expr
-          | Value Val
-          | Let Name Expr Expr
-          | Case Expr Alts
-          | LetRec Name Expr Expr -- LetRec "Name" = Expr in Expr
-          | Fix Expr
-          | Add Expr Expr
-          | Sub Expr Expr
-          | Mul Expr Expr
-          | Div Expr Expr
-          | Abs Expr
-          | Tail Expr
+data Expr = Var Name                -- Variable
+          | App Expr Expr           -- Application
+          | Abstr Name Expr         -- Abstraction
+          | Value Val               -- Value Literal
+          | Let Name Expr Expr      -- Let expression
+          | Case Expr Alts          -- Case expression
+          | LetRec Name Expr Expr   -- LetRec "Name" = Expr in Expr
           | Ellipsis Expr Idx Idx Name
           | Cons Expr Expr
-          | Cat Expr Expr
-          | Error String
-          | Report Expr
-          | Pair Expr Expr
-          | ListElement Name Idx
-          | Trace String Expr Expr
-          | Eq Expr Expr
+          | Cat Expr Expr           -- list1 ++ list2
+          | Error String            -- Creates an error
+          | Pair Expr Expr          -- (expr1, expr2)
+          | ListElement Name Idx    -- x[k]
+          | Trace String Expr Expr  -- Debug
+          | Eq Expr Expr            -- Relational Operators
           | Lt Expr Expr
           | Gt Expr Expr
           | Leq Expr Expr
           | Geq Expr Expr
-          | Or Expr Expr
+          | Or Expr Expr            -- Boolean Operators
           | Not Expr
           | And Expr Expr
+          | Add Expr Expr           -- Arithmetic Operators
+          | Sub Expr Expr
+          | Mul Expr Expr
+          | Div Expr Expr
+          | Abs Expr
           deriving (Eq, Show, Data)
 
-data Val = Con Int 
-          | ICons Int Val 
-          | VCons Val Val
-          | Empty 
-          | Closure Name Expr Env
-          | Fun Name Expr
-          | Plus Val Val
-          | Fixed Expr
-          | FreeVar Name
-          | VPair Val Val
-          | VStr String
-          | Boolean Bool
-         deriving (Eq, Show, Data)
+data Val    = Con Int 
+              | VCons Val Val
+              | Empty 
+              | Closure Name Expr Env
+              | FreeVar Name
+              | VPair Val Val
+              | VStr String
+              | Boolean Bool
+             deriving (Eq, Show, Data)
 
 data Pattern = PCons Name Name
              | PCons' Expr Expr
@@ -69,9 +62,9 @@ data Idx    = IPlace Int        -- Reflect work they're doing --
             deriving (Eq, Show, Data)
 
 -- Bindee?
-data Binding    = BVal Val 
-                | ListFuture Name 
-                | LenFuture Name
+data Bindee    = BVal Val
+               | ListFuture Name
+               | LenFuture Name
                 deriving (Eq, Show, Data)
 
 -- create an iterator
@@ -82,9 +75,9 @@ data Binding    = BVal Val
 -- 
 
 type Name = String
-
-type Env = [(Name, Binding)]
+type Env = [(Name, Bindee)]
 type Alts = [(Pattern, Expr)]
+
 
 
 
@@ -102,74 +95,99 @@ ycomb = Abstr "f" $
 
 -- Evaluate an Expression in an Environment into a Value
 eval :: Env -> Expr -> Val
+
 eval e (Var vn)            = evalBinding (envLookup e vn) e
+
 eval e (App t1 t2)         = case eval e t1 of 
-                                Closure x t1b e2 -> eval ((x, BVal $ eval e t2):e2) t1b
-                                _           -> errorOut e "Expected fn to be applied"
+    Closure x t1b e2 -> eval ((x, BVal $ eval e t2):e2) t1b
+    _           -> errorOut e "Expected fn to be applied"
+
 eval e (Abstr x t)         = Closure x t e
+
 eval e (Let n t1 t2)       = eval ((n, BVal $ eval e t1):e) t2
+
 eval e (Add t1 t2)         = case (eval e t1, eval e t2) of
-                                (Con i1, Con i2)    -> Con (i1 + i2)
-                                _                   -> errorOut' e "Bad add terms" 
+    (Con i1, Con i2)    -> Con (i1 + i2)
+    _                   -> errorOut' e "Bad add terms" 
+
 eval e (Sub t1 t2)         = case (eval e t1, eval e t2) of
-                                (Con i1, Con i2)    -> Con (i1 - i2)
-                                _                   -> errorOut' e "Bad sub terms" 
+    (Con i1, Con i2)    -> Con (i1 - i2)
+    _                   -> errorOut' e "Bad sub terms" 
+
 eval e (Mul t1 t2)          = case (eval e t1, eval e t2) of
-                                (Con i1, Con i2)    -> Con (i1 * i2)
-                                _                   -> errorOut' e "Bad mul terms"
+    (Con i1, Con i2)    -> Con (i1 * i2)
+    _                   -> errorOut' e "Bad mul terms"
+
 eval e (Div t1 t2)          = case (eval e t1, eval e t2) of
-                                (Con i1, Con i2)    -> Con (i1 `div` i2)
-                                _                   -> errorOut' e "Bad div terms"
+    (Con i1, Con i2)    -> Con (i1 `div` i2)
+    _                   -> errorOut' e "Bad div terms"
+
 eval e (Abs t)              = case eval e t of
-                                (Con i)             -> Con (abs i)
-                                _                   -> errorOut' e "Bad abs term"
+    (Con i)             -> Con (abs i)
+    _                   -> errorOut' e "Bad abs term"
+
 eval e (LetRec n t1 t2)    = case eval e t1 of
-                                Closure {}  -> eval ((n, BVal $ eval e $ App ycomb (Abstr n t1)):e) t2
-                                                    -- fn = fix (\fn.t1)
-                                _           -> errorOut e "Expected fn to be letrecced"
+    Closure {}  -> eval ((n, BVal $ eval e $ App ycomb (Abstr n t1)):e) t2
+    _           -> errorOut e "Expected fn to be letrecced"
+
 eval e (Value v)            = v
-eval e (Tail t)             = case eval e t of
-                                (ICons _ tail)           -> tail
-                                _                       -> errorOut e ("not a list " ++ show t)
+
 eval e (Case tc ps)   = patternMatchEval e tc ps
+
 eval e (Cons t1 t2)  = VCons (eval e t1) (eval e t2)
+
 eval e (Pair t1 t2)  = VPair (eval e t1) (eval e t2)
-eval e (Cat t1 t2)    = let et1 = iconsToVCons $ eval e t1
-                            et2 = iconsToVCons $ eval e t2
-                        in case (et1, et2) of
-                            (VCons _ _, VCons _ _) -> catVCons et1 et2
-                            (VCons _ _, Empty)     -> et1
-                            (Empty, VCons _ _)     -> et2
-                            _                      -> errorOut e "Tried to cat non-lists"
+
+eval e (Cat t1 t2)    = 
+    let et1 = eval e t1
+        et2 = eval e t2
+    in case (et1, et2) of
+        (VCons _ _, VCons _ _) -> catVCons et1 et2
+        (VCons _ _, Empty)     -> et1
+        (Empty, VCons _ _)     -> et2
+        _                      -> errorOut e "Tried to cat non-lists"
+
 eval e (ListElement n i)    = findListFutureElement e (envLookup e n) i
+
 eval e (Error s)      = errorOut e s
+
 eval e (Ellipsis t ib ie vn) =
     let list = evalBinding (envLookup e vn) e
     in evalEllipsis e list t vn ib ie
-eval e (Trace s tt t)        = trace (s ++ ": " ++ ppVal (eval e tt)) $ eval e t
+
+eval e (Trace s tt t)       = trace (s ++ ": " ++ ppVal (eval e tt)) $ eval e t
+
 eval e (Eq t1 t2)           = Boolean (eval e t1 == eval e t2)
+
 eval e (Lt t1 t2)           = case (eval e t1, eval e t2) of
     (Con x1, Con x2)    -> Boolean $ x1 < x2
     (v1, v2)            -> errorOut e $ "Tried to Lt two non-integers: " ++ show v1 ++ " < " ++ show v2
+
 eval e (Gt t1 t2)           = case (eval e t1, eval e t2) of
     (Con x1, Con x2)    -> Boolean $ x1 > x2
     (v1, v2)            -> errorOut e $ "Tried to Gt two non-integers: " ++ show v1 ++ " > " ++ show v2
+
 eval e (Leq t1 t2)          = case (eval e t1, eval e t2) of
     (Con x1, Con x2)    -> Boolean $ x1 <= x2
     (v1, v2)            -> errorOut e $ "Tried to Leq two non-integers: " ++ show v1 ++ " <= " ++ show v2
+
 eval e (Geq t1 t2)           = case (eval e t1, eval e t2) of
     (Con x1, Con x2)    -> Boolean $ x1 >= x2
     (v1, v2)            -> errorOut e $ "Tried to Geq two non-integers: " ++ show v1 ++ " >= " ++ show v2
+
 eval e (Or t1 t2)           = case (eval e t1, eval e t2) of
     (Boolean b1, Boolean b2)    -> Boolean $ b1 || b2
     (v1, v2)                    -> errorOut e $ "Tried to OR non-booleans: " ++ show v1 ++ " || " ++ show v2
+
 eval e (And t1 t2)           = case (eval e t1, eval e t2) of
     (Boolean b1, Boolean b2)    -> Boolean $ b1 && b2
     (v1, v2)                    -> errorOut e $ "Tried to AND non-booleans: " ++ show v1 ++ " && " ++ show v2
+
 eval e (Not t)               = case eval e t of
     Boolean b   -> Boolean $ not b
     v           -> errorOut e $ "Tried to NOT a non-boolean: " ++ show v
-eval e x              = errorOut e $ "Feature not implemented: " ++ show x
+
+-- eval e x              = errorOut e $ "Feature not implemented: " ++ show x
 
 evalEllipsis :: Env -> Val -> Expr -> Name -> Idx -> Idx -> Val
 evalEllipsis e l t n ib ie = 
@@ -232,9 +250,9 @@ realizeComprehension n i t = everywhere (mkT $ replaceVarWithElement n i) t
             replaceVarWithElement n1 i (Var n2) = if n1 == n2 then ListElement n1 i else Var n2
             replaceVarWithElement _ _ t         = t
 
-findListFutureElement :: Env -> Binding -> Idx -> Val
+findListFutureElement :: Env -> Bindee -> Idx -> Val
 findListFutureElement e (ListFuture n) i = findNthElement
-        (iconsToVCons $ evalBinding (envLookup e n) e) 
+        (evalBinding (envLookup e n) e) 
         intIdx
     where   findNthElement :: Val -> Int -> Val
             findNthElement (VCons x xs) i    
@@ -257,9 +275,6 @@ errorOut e s = error (s ++ "; Environment: " ++ ppEnv e)
 errorOut' :: Env -> String -> a
 errorOut' e s = error (s ++ "; Environment: " ++ ppEnv e)
 
-iconsToVCons :: Val -> Val
-iconsToVCons (ICons x xs)   = VCons (Con x) (iconsToVCons xs)
-iconsToVCons x              = x
 
 catVCons :: Val -> Val -> Val
 catVCons (VCons x xs) ys    = VCons x (catVCons xs ys)
@@ -283,7 +298,6 @@ patternMatch :: Env -> Expr -> (Pattern, Expr) -> Maybe Val
 patternMatch e t (PVal k, t2)             = if eval e t == k then Just $ eval e t2
                                                 else Nothing
 patternMatch e t (PCons n ns, t2)         = case eval e t of
-                                                ICons x xs  -> Just $ eval ((n,BVal $ Con x):(ns,BVal xs):e) t2
                                                 VCons x xs  -> Just $ eval ((n, BVal x):(ns,BVal xs):e) t2
                                                 _           -> Nothing
 patternMatch e t (PVar n, t2)             = Just $ eval ((n, BVal $ eval e t):e) t2 
@@ -310,18 +324,17 @@ patternMatch e t (PCons' tl tls, t2) =
 -- patternMatch e t _                        = Nothing
 
 -- Find a variable in environment
-envLookup :: Env -> Name -> Binding
+envLookup :: Env -> Name -> Bindee
 envLookup [] name                       = BVal $ FreeVar name 
                                         --error $ "envLookup: can't find " ++ name ++ " in env"
 envLookup ((env_name, env_val):xs) name = if name == env_name then env_val
                                           else envLookup xs name
 getLen :: Val -> Int
 getLen (VCons x xs) = 1 + getLen xs
-getLen (ICons x xs) = 1 + getLen xs
 getLen Empty        = 0
 getLen term         = error ("getLen encountered bad var: " ++ show term)
 
-evalBinding :: Binding -> Env -> Val
+evalBinding :: Bindee -> Env -> Val
 evalBinding (BVal v) e      = v
 evalBinding (LenFuture n) e  = Con $ getLen boundList
     where   boundList :: Val
@@ -370,7 +383,8 @@ pp (Geq t1 t2)          = pp t1 ++ " >= " ++ pp t2
 pp (Or t1 t2)           = pp t1 ++ " || " ++ pp t2
 pp (And t1 t2)          = pp t1 ++ " && " ++ pp t2
 pp (Not t)              = "!(" ++ pp t ++ ")"
-pp _            = "Error -- cannot display expression"
+pp (Error s)            = "error " ++ s
+-- pp _            = "Error -- cannot display expression"
 
 ppMatch :: Alts -> String
 ppMatch []              = ""
@@ -391,11 +405,9 @@ ppIdx (EPlace t) = pp t
 
 ppVal :: Val -> String
 ppVal (Con i)       = show i
-ppVal (ICons i v)    = show i ++ " " ++ ppVal v
 ppVal (VCons v vs)   = ppVal v ++ " " ++ ppVal vs
 ppVal Empty       = "Empty"
-ppVal (Closure n e _)   = "Function " ++ n ++ " : " ++ pp e
-ppVal (Plus v1 v2)  = ppVal v1 ++ " + " ++ ppVal v2
+ppVal (Closure n t e)   = "CLOSURE( " ++ ppEnv e ++ "|-" ++ pp (Abstr n t) ++ ")"
 ppVal (FreeVar n)   = n
 ppVal (VPair v1 v2) = "(" ++ ppVal v1 ++ ", " ++ ppVal v2 ++ ")"
 ppVal (Boolean b)   = if b then "True" else "False"
