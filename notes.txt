@@ -1,3 +1,35 @@
+writeup.txt:
+map f l = Case l of
+    x1 ... xn -> f x1 ... f xn
+
+The Ellipsis pattern (LHS) stores the following data:
+- x, a ListFuture that "points" at l
+- n, the length of the list
+
+The Ellipsis constructor (RHS) has the following data:
+- The expression applied to each term (App f x)
+- The first index (1)
+- The last index (n)
+- The variable being iterated upon (x)
+
+When eval encounters an Ellipsis constructor, it evalutes it like this:
+- Check the indices, if it points backwards, reverse the list and transform the indices
+- Take the list and cut it to the first element (For example, for [1,2,3,4,5], x3 ... xn would move to [3,4,5])
+- Take the "range" to count down as we go through the list
+- Iterate through the list:
+    If countdown is done, return empty
+    If coundown is not done, but the list is empty, runtime error (e.x., for [1,2,3], x1 ... xn -> x1 ... x4 would make a runtime error)
+    Otherwise, evaluate the expression applied to each term (e.x., in map f x applied to [1,2,3], it "x" would be replaced by 1, then 2, then 3.
+
+
+Empty + 1 in binSearch
+
+-- create an iterator
+-- 
+
+-- \l. case l of
+-- x1 ... xn --> [("l", a list), ("x", ListFuture "l"), ("n", LenFuture "l")]
+-- 
 Writeup:
 
 map f l = Case l of
