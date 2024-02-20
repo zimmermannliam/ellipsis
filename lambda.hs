@@ -803,6 +803,11 @@ binSearch' = Abstr "list" $ Abstr "term" (LetRec "binSearch" (Abstr "l" $ Abstr 
     (App (App (Var "binSearch") (Var "list")) (Var "term"))
     )
 
+pairAdj' :: Expr
+pairAdj' = Abstr "l" $ Case l -- of
+    [
+        (PEllipsis "x" (End "n"), Ellipsis (Pair x0 x1) [EllipRange {ident=0, var="x", ib=IPlace 1, ie=EPlace $ Sub n (Value $ Con 1)}, EllipRange {ident=1, var="x", ib=IPlace 2, ie=End "n"}])
+    ]
 
 {-
 mergeSort' :: Expr
