@@ -21,7 +21,6 @@ data Expr = Var Name                -- Variable
           | Case Expr Alts          -- Case expression
           | LetRec Name Expr Expr   -- LetRec "Name" = Expr in Expr
           | Ellipsis Expr EllipRanges
-          | Ellipsis' Expr EllipRanges
           | Cons Expr Expr          -- expr1:list
           | Cat Expr Expr           -- list1 ++ list2
           | Error String            -- Creates an error
@@ -122,7 +121,7 @@ eval e (Add t1 t2) = case (eval e t1, eval e t2) of
 
 eval e (Sub t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 - i2)
-    _                   -> errorOut' e "Bad sub terms" 
+    (v1, v2)            -> errorOut' e $ "Bad sub terms: " ++ show v1 ++ " - " ++ show v2
 
 eval e (Mul t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 * i2)
@@ -166,11 +165,6 @@ eval e (ListElement n i) = findListFutureElement e (envLookup e n) i
 eval e (Error s) = errorOut e s
 
 eval e (Ellipsis t rs) =
-    case evalEllipsis e t rs of
-        Right v                 -> v
-        Left (EllipError err)   -> errorOut e $ "Error processing Ellipsis: " ++ err
-
-eval e (Ellipsis' t rs) =
     case evalEllipsis e t rs of
         Right v                 -> v
         Left (EllipError err)   -> errorOut e $ "Error processing Ellipsis: " ++ err
@@ -240,20 +234,19 @@ calcRange e rs = if all (== head ranges) ranges
     else Left $ EllipError "Unequal ranges"
     where fstIdxs = map (idxToInt e . ib) rs
           lstIdxs = map (idxToInt e . ie) rs
-          ranges  = zipWith (\x y -> abs (x-y)+1) lstIdxs fstIdxs
+          ranges  = zipWith (\x y -> (x-y)+1) lstIdxs fstIdxs
 
 getList :: Env -> EllipRange -> Either EllipError Val
 getList e (EllipRange {var=var, ib=ib, ie=ie})
-    | ie'' > len    = Left $ EllipError ("Index end went too high: " ++ show ib' ++ ".." ++ show ie' ++ "->"++show ib''++ ".."++show ie''++">"++show len)
-    | ib'' < 1 || ie'' < 1  = Left $ EllipError ("Index went below 1: "++ show ib' ++ ".." ++ show ie' ++ "->"++ show ib''++".."++show ie''++"; list: "++show list')
-    | otherwise = Right $ startingAtNthCons list' ib''
+    | ie' > len = Right Empty
+    | ib' < 1 = Right Empty
+    | otherwise = Right $ startingAtNthCons list' ib'
     where
         list = evalBinding e (ListFuture var)
         len = getLen e list
         ib' = idxToInt e ib
         ie' = idxToInt e ie
-        list' = if ib' > ie' then reverseCons list else list
-        (ib'', ie'') = if ib' > ie' then (len - ib' + 1, len - ie' + 1) else (ib', ie')
+        list' = if ib' > ie' then Empty else list
 
 parseListErrors :: [Either EllipError Val] -> Either EllipError [Val]
 parseListErrors l =
@@ -302,7 +295,7 @@ findListFutureElement e (ListFuture n) i = findNthElement
             findNthElement (VCons x xs) i    
                 | i == 1    = x
                 | i > 1     = findNthElement xs (i - 1)
-                | i == 0    = Empty
+                -- | i == 0    = Empty
                 | otherwise = error $ "ListElement: bad i: " ++ show i
             findNthElement Empty i          = error $ "ListElement: not long enough! i: " ++ show i
             findNthElement x _              = error ("ListElement: non-list element detected:" ++ show x)
@@ -775,28 +768,25 @@ listId' = Abstr "l" $ Case (Var "l") -- of
     ]
 
 binSearch' :: Expr
-binSearch' = Abstr "list" $ Abstr "term" (LetRec "binSearch" (Abstr "l" $ Abstr "t" $ Trace "l" l $ Case (Var "l") -- of
+binSearch' = Abstr "list" $ Abstr "term" (LetRec "binSearch" (Abstr "l" $ Abstr "t" 
+    -- $ Trace "l" l 
+    $ Case (Var "l") -- of
     [
         (PVal Empty,    Value $ Con 0),
-        (PCons' (Var "x") (Value Empty), Case (App (App cmp x) t) -- of
-            [
-                (PVal $ Con 0, Value $ Con 1),
-                (PVar "_", Value $ Con 0)
-            ]),
-        (PEllipsis "x" (End "n"),     Let "k" (Div n (Value $ Con 2)) $ 
+        (PEllipsis "x" (End "n"),     Let "k" (Add (Div n (Value $ Con 2)) (Value $ Con 1)) $ 
             Case (App (App cmp (ListElement "x" (EPlace k))) t)
             [
                 (PVal $ Con 0,    Value $ Con 1),
                 (PVal $ Con 1, App (App (Var "binSearch") (ellipOne x0 
-                                                                        (IPlace 1) 
-                                                                        (EPlace $ Sub k (Value $ Con 1))
-                                                                        "x")) 
-                                                                        t),
+                    (IPlace 1) 
+                    (EPlace $ Sub k (Value $ Con 1))
+                    "x")) 
+                    t),
                 (PVal $ Con (-1), App (App (Var "binSearch") (ellipOne x0
-                                                                        (EPlace $ Add k (Value $ Con 1)) 
-                                                                        (End "n")
-                                                                        "x"))
-                                                                        t)
+                    (EPlace $ Add k (Value $ Con 1)) 
+                    (End "n")
+                    "x"))
+                    t)
             ]
         )
     ]) -- in
