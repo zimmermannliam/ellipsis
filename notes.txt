@@ -1,3 +1,19 @@
+
+Issue: Empty lists
+
+
+binSearch = \l.\t.case l of
+    Empty -> False
+    x1 ... xn -> let k = n/2 + 1 in 
+        if x[k] == t then       True
+        else if x[k] > t then   binSearch x[1] ... x[k-1] t
+        else                    binSearch x[k+1] ... x[n] t
+            
+
+
+
+
+
 writeup.txt:
 map f l = Case l of
     x1 ... xn -> f x1 ... f xn
