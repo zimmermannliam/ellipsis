@@ -41,7 +41,8 @@ data Expr = Var Name                -- Variable
           | Div Expr Expr
           | Mod Expr Expr
           | Abs Expr
-          | EllipVar Name Id
+          | EllipVar Id
+          | EllipNum Id
           deriving (Eq, Show, Data)
 
 data Val    = Con Int 
@@ -204,7 +205,10 @@ eval e (Not t) = case eval e t of
     Boolean b   -> Boolean $ not b
     v           -> errorOut e $ "Tried to NOT a non-boolean: " ++ show v
 
-eval e (EllipVar n i)   = errorOut e "Tried to evaluate an EllipVar"
+
+
+
+eval e (EllipVar i)   = errorOut e "Tried to evaluate an EllipVar"
 
 -- eval e x              = errorOut e $ "Feature not implemented: " ++ show x
 
@@ -223,13 +227,14 @@ iterateLists e ls t i
     | otherwise = do
     let heads = map (vConsHead . snd) ls
     let idToVal = Data.Map.fromList $ zip (map (ident . fst) ls) heads
-    if Empty `elem` heads then Right Empty
+    if (== Empty) `any` heads then Right Empty
+--     else VCons (eval e $ replaceEllipVars idToVal t) <$> iterateLists e (map (Data.Bifunctor.second vConsTail) ls) t (i-1)
     else VCons (eval e $ replaceEllipVars idToVal t) <$> iterateLists e (map (Data.Bifunctor.second vConsTail) ls) t (i-1)
 
 replaceEllipVars :: Data.Map.Map Int Val -> Expr -> Expr
 replaceEllipVars rs = everywhere (mkT $ replaceEllipVar rs)
     where   replaceEllipVar :: Data.Map.Map Int Val -> Expr -> Expr
-            replaceEllipVar rs (EllipVar _ id)  = Value (rs Data.Map.! id)
+            replaceEllipVar rs (EllipVar id)  = Value (rs Data.Map.! id)
             replaceEllipVar _ t                 = t
 
 
@@ -460,7 +465,7 @@ ppEllipExpr :: EllipRanges -> EllipSide -> Expr -> String
 ppEllipExpr rs side t = pp' 0 $ everywhere (mkT $ ellipVarToListElement rs side) t
     where
     ellipVarToListElement :: EllipRanges -> EllipSide -> Expr -> Expr
-    ellipVarToListElement rs side (EllipVar _ id) = let r = rangeLookup rs id
+    ellipVarToListElement rs side (EllipVar id) = let r = rangeLookup rs id
         in ListElement (var r) (if side == Begin then ib r else ie r)
     ellipVarToListElement _ _ t = t
 
@@ -510,8 +515,8 @@ ppEnv e     = "<\n" ++ ppEnv' e ++ ">"
 ------------------------------------------------------------------------
 
 -- SMART CONSTRUCTORS
-[f,x,n,l,r,m,k,t,y] = map Var ["f","x","n","l","r","m","k","t","y"]
-[x0,x1] = map (EllipVar "x") [0,1]
+[f,x,n,l,r,m,k,t,y,k'] = map Var ["f","x","n","l","r","m","k","t","y","k'"]
+[x0,x1] = map (EllipVar) [0,1]
 
 con :: Int -> Expr
 con i = Value $ Con i
@@ -520,7 +525,11 @@ cons :: [Int] -> Expr
 cons l = foldr1 Cons (map con l ++ [Value Empty]) 
 
 ellipOne :: Expr -> Idx -> Idx -> Name -> Expr
-ellipOne t ib ie vn = Ellipsis t [EllipRange {ib=ib, ident=0, ie=ie, var=vn}]
+ellipOne t ib ie n = Ellipsis t [EllipRange {var=n, ident=0, ib=ib, ie=ie}]
+
+
+[v0,v1] = map EllipVar [0,1,2]
+[n0,n1] = map EllipNum [0,1,2]
 
 listToVCons :: [Val] -> Val
 listToVCons  = foldr VCons Empty
@@ -852,8 +861,29 @@ pairAdj' = Abstr "l" $ Case l -- of
         (PEllipsis "x" (End "n"), Ellipsis (Pair x0 x1) [EllipRange {ident=0, var="x", ib=IPlace 1, ie=EPlace $ Sub n (Value $ Con 1)}, EllipRange {ident=1, var="x", ib=IPlace 2, ie=End "n"}])
     ]
 
+rotL' :: Expr
+rotL' = Abstr "l" $ Abstr "k" $ Case l -- of
+    [
+        (PEllipsis "x" (End "n"), Let "k'" (k `Mod` n) $
+        ellipOne x0 (EPlace $ k' `Add` Value (Con 1)) (EPlace n) "x"
+            `Cat` ellipOne x0 (IPlace 1) (EPlace k') "x")
+    ]
 
-favorites = [("binSearch", binSearch'), ("pairAdj", pairAdj')]
+-- Unfinsihed
+rotR' :: Expr
+rotR' = Abstr "l" $ Abstr "k" $ Case l -- of
+    [
+        (PEllipsis "x" (End "n"), Let "k'" (k `Mod` n) $
+        ellipOne x0 (EPlace $ k' `Add` Value (Con 1)) (EPlace n) "x"
+            `Cat` ellipOne x0 (IPlace 1) (EPlace k') "x")
+    ]
+
+subArrays' :: Expr
+subArrays' = Abstr "l" $ Abstr "k" $ Case l -- of
+    [
+    ]
+
+favorites = [("binSearch", binSearch'), ("pairAdj", pairAdj'), ("rotL", rotL')]
 
 printFavorites = putStrLn $ foldl (\x y -> x++"\n\n"++y) "\nFavorite examples:" $ map (\(n, e) -> n ++ ": \n" ++ pp e) favorites
 
@@ -866,7 +896,7 @@ mergeSort' = Abstr "l" $ LetRec "mergeSort" -- =
         (PEllipsis "x" (End "n"), 
 
         )
-    ])
+        (PEllipsis "x" (End "n"), )
     -- in
     (App (Var "mergeSort") (Var "l"))
 
