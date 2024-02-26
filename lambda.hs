@@ -379,15 +379,17 @@ patternMatch e t (PCons n ns, t2)         = case eval e t of
                                                 VCons x xs  -> Just $ eval (Map.fromList [(NamedVar n, BVal x),(NamedVar ns,BVal xs)] `Map.union` e) t2
                                                 _           -> Nothing
 patternMatch e t (PVar n, t2)             = Just $ eval (Map.insert (NamedVar n) (BVal $ eval e t) e) t2 
-patternMatch e t (PEllipsis n i, t2)      = Just $ eval (Map.fromList [(NamedVar n, ListFuture n_t), 
-                                                          (NamedVar n_idx, LenFuture n_t)
-                                                         ] `Map.union` e) t2
-                    where   n_idx = case i of
-                                (End n) -> n
-                                _       -> error "Tried to unpack a bad end idx for ellipsis pattern"
-                            n_t = case t of
-                                (Var n) -> n
-                                _       -> error "Tried to unpack bad name-term for ellipsis pattern"
+patternMatch e t (PEllipsis n i, t2)      = let 
+    list = eval e t
+    n_idx = case i of
+        (End n) -> n
+        _       -> error "Tried to unpack a bad ending idx for ellipsis pattern"
+    n_t = case eval Map.empty t of
+        (FreeVar n) -> n
+        _       -> error "Tried to unpack a bad name-term for ellipsis pattern"
+    in if valIsList list
+        then Just $ eval (Map.fromList [(NamedVar n, ListFuture n_t), (NamedVar n_idx, LenFuture n_t)] `Map.union` e) t2
+        else Nothing
 patternMatch e t (PCons' tl tls, t2) =
     let vl = eval e tl
         vls = eval e tls
@@ -400,6 +402,24 @@ patternMatch e t (PCons' tl tls, t2) =
         (_,          _,           _         ) -> Nothing
         
 -- patternMatch e t _                        = Nothing
+
+valIsList :: Val -> Bool
+valIsList Empty         = True
+valIsList (VCons _ xs)  = valIsList xs
+valIsList _             = False
+
+
+{-
+= Just $ eval (Map.fromList [(NamedVar n, ListFuture n_t), 
+                                                          (NamedVar n_idx, LenFuture n_t)
+                                                         ] `Map.union` e) t2
+                    where   n_idx = case i of
+                                (End n) -> n
+                                _       -> error "Tried to unpack a bad end idx for ellipsis pattern"
+                            n_t = case t of
+                                (Var n) -> n
+                                _       -> error "Tried to unpack bad name-term for ellipsis pattern"
+-}
 
 -- Find a variable in environment
 envLookup :: Env -> Name -> Bindee
