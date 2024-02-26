@@ -32,6 +32,7 @@ data Expr = Var Name                -- Variable
           | Gt Expr Expr
           | Leq Expr Expr
           | Geq Expr Expr
+          | Neq Expr Expr
           | Or Expr Expr            -- Boolean Operators
           | Not Expr
           | And Expr Expr
@@ -196,6 +197,8 @@ eval e (Ellipsis t rs) = let
 eval e (Trace s tt t) = trace (s ++ ": " ++ ppVal (eval e tt)) $ eval e t
 
 eval e (Eq t1 t2) = Boolean (eval e t1 == eval e t2)
+
+eval e (Neq t1 t2) = Boolean (eval e t1 /= eval e t2)
 
 eval e (Lt t1 t2) = case (eval e t1, eval e t2) of
     (Con x1, Con x2)    -> Boolean $ x1 < x2
@@ -479,6 +482,7 @@ pp' tabs (Mod t1 t2)          = pp' tabs t1 ++ "%" ++ pp' tabs t2
 pp' tabs (Abs t)              = "|" ++ pp' tabs t ++ "|"
 pp' tabs (Trace _ _ t)        = pp' tabs t
 pp' tabs (Eq t1 t2)           = pp' tabs t1 ++ " == " ++ pp' tabs t2
+pp' tabs (Neq t1 t2)           = pp' tabs t1 ++ " != " ++ pp' tabs t2
 pp' tabs (Lt t1 t2)           = pp' tabs t1 ++ " < " ++ pp' tabs t2
 pp' tabs (Gt t1 t2)           = pp' tabs t1 ++ " > " ++ pp' tabs t2
 pp' tabs (Leq t1 t2)          = pp' tabs t1 ++ " <= " ++ pp' tabs t2
