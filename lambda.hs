@@ -112,6 +112,10 @@ type Env                = Map.Map Identifier Bindee
 -- ASSUME EVERY VARIABLE IS NAMED SEPARATELY
 ---------------------------------------------------------------------------------
 
+head' :: [a] -> a
+head' [] = error "Blah blah blah blah error"
+head' (x:xs) = x
+
 -- y combinator
 -- \f.( (\x.(f (x x))) (\x.(f (x x))) )
 ycomb :: Expr
@@ -314,6 +318,11 @@ idxToInt e (IPlace i)   = i
 idxToInt e (End n)      = valEvalInt $ eval e (Var n)
 idxToInt e (EPlace t)   = valEvalInt $ eval e t
 
+idxToExpr :: Idx -> Expr
+idxToExpr (EPlace t) = t
+idxToExpr (IPlace i) = Value $ Con i
+idxToExpr (End n)    = Var n
+
 findListFutureElement :: Env -> Bindee -> Idx -> Val
 findListFutureElement e (ListFuture n) i = findNthElement
         (evalBinding e (envLookup e n) ) 
@@ -416,7 +425,14 @@ evalBinding e (BIterator {it_ic=ic, content=c}) = case c of
 
 
 rangeLookup :: EllipRanges -> Int -> EllipRange
-rangeLookup rs i = head $ filter (\r -> ident r == i) rs
+rangeLookup rs i = case filter (\r -> ident r == i) rs of
+    []      -> error $ "Could not find range ID " ++ show i ++ " in rs: " ++ show rs
+    [x]     -> x
+    (x:xs)  -> error $ "Somehow too many hits for range ID " ++ show i ++ " in rs: " ++ show rs
+
+
+rangeLookup' :: EllipRanges -> Int -> Maybe EllipRange
+rangeLookup' rs i = find (\r -> ident r == i) rs
 
 ------------------------------------------------------------------------
 -- PARSE
@@ -448,7 +464,7 @@ pp' tabs (Case e alts)        =
     if all (\alt -> case fst alt of
             PVal (Boolean _) -> True
             _ -> False) alts && length alts == 2
-    then "if " ++ pp' tabs e ++ " then "  ++ pp' tabs (snd $ head alts) ++ pNewline tabs ++ "else " ++ pp' tabs (snd $ alts!!1)
+    then "if " ++ pp' tabs e ++ " then "  ++ pp' tabs (snd $ head $ filter (\x -> fst x == PVal (Boolean True)) alts) ++ pNewline tabs ++ "else " ++ pp' tabs (snd $ head $ filter (\x-> fst x == PVal (Boolean False)) alts)
     else "case " ++ pp' tabs e ++ " of" ++ ppMatch alts (tabs + 1)
 pp' tabs (LetRec  n e1 e2)    = "letrec " ++ n ++ " = (" ++ pp' tabs e1 ++ pNewline tabs ++ ") in " ++ pp' tabs e2
 pp' tabs (Cons e1 e2)         = "(" ++ pp' tabs e1 ++ " : " ++ pp' tabs e2 ++ ")"
@@ -472,23 +488,37 @@ pp' tabs (And t1 t2)          = pp' tabs t1 ++ " && " ++ pp' tabs t2
 pp' tabs (Not t)              = "!(" ++ pp' tabs t ++ ")"
 pp' tabs (Error s)            = "error " ++ s
 pp' tabs ellip@(Ellipsis _ _) = ppEllip ellip
-pp' tabs _            = "Error -- cannot display expression"
+pp' tabs (EllipVar i)         = "EllipVar(" ++ show i ++ ")"
+-- pp' tabs _            = "Error -- cannot display expression"
 
 ppEllip :: Expr -> String
 ppEllip (Ellipsis t rs) = let
-    tb = ppEllipExpr rs Begin t
-    te = ppEllipExpr rs EndSide t
+    tb = pp $ ellipExprReplace rs Begin t
+    te = pp $ ellipExprReplace rs EndSide t
     in
-    tb ++ " ... " ++ te
+    "(" ++ tb ++ " ... " ++ te ++ ")"
 ppEllip _ = error "Trying to ppEllip non-ellip"
 
-ppEllipExpr :: EllipRanges -> EllipSide -> Expr -> String
-ppEllipExpr rs side t = pp' 0 $ everywhere (mkT $ ellipVarToListElement rs side) t
-    where
-    ellipVarToListElement :: EllipRanges -> EllipSide -> Expr -> Expr
-    ellipVarToListElement rs side (EllipVar id) = let r = rangeLookup rs id
-        in ListElement (var r) (if side == Begin then ib r else ie r)
-    ellipVarToListElement _ _ t = t
+ellipExprReplace :: EllipRanges -> EllipSide -> Expr -> Expr
+ellipExprReplace rs side = everywhere (mkT $ ellipVarToListElement rs side)
+
+ellipVarToListElement :: EllipRanges -> EllipSide -> Expr -> Expr
+ellipVarToListElement rs side t@(EllipVar id) = let r = rangeLookup' rs id
+    in case r of
+        Just r'     -> if contentT r' == BeList 
+            then ListElement (var r') (if side == Begin then ib r' else ie r')
+            else (if side == Begin then idxToExpr $ ib r' else idxToExpr $ ie r')
+        Nothing     -> t
+ellipVarToListElement rs side (Ellipsis t innerRs) = Ellipsis t mappedInnerRs
+    where 
+    mappedInnerRs   = map (\x -> x { ib=case ib x of
+        EPlace t' -> EPlace $ ellipExprReplace rs side t'
+        otherIdx  -> otherIdx
+        , ie=case ie x of
+        EPlace t' -> EPlace $ ellipExprReplace rs side t'
+        otherIdx  -> otherIdx}) innerRs
+    -- innerTerm       = ellipExprReplace (rs ++ mappedInnerRs) side t
+ellipVarToListElement _ _ t = t
 
 ppMatch :: Alts -> Int -> String
 ppMatch [] _                = ""
@@ -610,8 +640,8 @@ cmp' = Abstr "l" $ Abstr "r" $ Case (Sub l r) -- of
 succ' :: Expr
 succ' = Abstr "x" $ Add (Var "x") (Value $ Con 1)
 
-head' :: Expr
-head' = Abstr "l" $ Case (Var "l") [(PVal Empty, Value Empty), (PCons "H" "T", Var "H")]
+-- head' :: Expr
+-- head' = Abstr "l" $ Case (Var "l") [(PVal Empty, Value Empty), (PCons "H" "T", Var "H")]
 
 tail' :: Expr
 tail' = Abstr "l" $ Case (Var "l") [(PVal Empty, Value Empty), (PCons "H" "T", Var "T")]
@@ -917,6 +947,14 @@ rotR' = Abstr "l" $ Abstr "k" $ Case l -- of
 subArrays' :: Expr
 subArrays' = Abstr "l" $ Abstr "k" $ Case l -- of
     [
+        (PVal Empty, Value Empty),
+        (PEllipsis "x" (End "n"), Ellipsis (Ellipsis x0 [EllipRange {ident=0, var="x", ib=EPlace x1, ie=EPlace (x1 `Add` k `Sub` Value (Con 1)), contentT=BeList}]) [EllipRange {ident=1, var="x", ib=IPlace 1, ie=EPlace (n `Sub` k `Add` Value (Con 1)), contentT=BeIndices}])
+    ]
+
+indices' :: Expr
+indices' = Abstr "l" $ Case l -- of
+    [
+        (PEllipsis "x" (End "n"), Ellipsis x0 [EllipRange {ident=0, var="", ib=IPlace 1, ie=EPlace n, contentT=BeIndices}])
     ]
 
 favorites = [("binSearch", binSearch'), ("pairAdj", pairAdj'), ("rotL", rotL')]
