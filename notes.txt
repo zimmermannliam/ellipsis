@@ -1,4 +1,51 @@
+could not currently do:
+arbFun l num = case l of
+    x1 ... xn -> (if num == 5 then x[1] else x[2]) ... x[n]
 
+(rewrite, seems more readable:
+arbFun' l num = case l of
+    x1 ... xn -> if num == 5 then x[1] ... x[n] else x[2] ... x[n]
+)
+
+or even:
+arbFun2 l num = case l of
+    x1 ... xn -> (if num == 5 then x[1] else x[2]) ... (if num == 5 then x[n] else x[n-1])
+
+bottom seems doable with some sort of lazy evaluation. Top would take some more work. Or maybe I could make if statements do something special?
+
+but I think I could do:
+mapOn fb fl l = case l of
+    x1 ... xn -> (if fb x[1] then (fl x[1]) else x[1]) ... (if fb x[n] then (fl x[n]) else x[n])
+
+mapOn' fb fl l = case l of
+    x1 ... xn -> ((if fb x[1] then fl else id) x[1]) ... 
+
+idea for parser:
+map' f l = case l of
+    x1 ... xn -> [f x[i] | i=1..n]
+
+pairAdj' l = case l of
+    x1 ... xn -> [(x[i], x[j]) | i=1..n-1, j=2..n]
+
+
+
+subArraysSizeK l k = case l of
+    x1 ... xn -> [[x[1] ... x[k]] ... [x[n-k+1] ... x[n]]]
+
+
+
+
+subArrays l k = case l of
+    x1 ... xn -> subArray l 1 k ... subArray l (n-k) n
+subArray l b e = case l of
+    x1 ... xn -> x[b] ... x[e]
+
+rotL l k = case l of
+    x1 ... xn -> [xk ... xn] ++ [x1 ... x[k-1]]
+
+
+rotL [1 2 3 4 5] 3 = [4 5 1 2 3]
+                  x[k+1] x[n] x[1] x[2] x[k]
 Issue: Empty lists
 
 

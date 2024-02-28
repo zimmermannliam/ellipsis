@@ -6,6 +6,8 @@ import Data.Either
 import Data.List
 import qualified Data.Map as Map
 import qualified Data.Bifunctor
+import Control.Monad
+import Control.Monad.State
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
@@ -240,40 +242,58 @@ eval e (Index idx)    = eval e $ idxToExpr idx
 processPreEllipsis :: Expr -> Expr
 processPreEllipsis (PreEllipsis t1 t2) = Ellipsis t rs
     where
-    (t,rs) = processPreEllipsis' t1 t2
+    (t,(rs,_)) = runState (processPreEllipsis' t1 t2) ([],0)
 processPreEllipsis _ = error "Trying to processPreEllipsis on non-preEllipsis"
 
-processPreEllipsis' :: Expr -> Expr -> (Expr, EllipRanges)
-processPreEllipsis' tBegin tEnd 
-    | tBegin == tEnd                   = (tBegin, [])
-    | otherwise                        = 
-        case (tBegin, tEnd) of
-            (ListElement vb idxb, ListElement ve idxe) -> if vb == ve then (EllipVar 0, [EllipRange 
-                { ident=0
-                , var=ve
-                , ib=idxb
-                , ie=idxe
-                , contentT=BeList }])
-                else error "Unequal variables in preEllips"
-            (Index idxb, Index idxe)          -> if idxb == idxe then (Index idxb, [])
-                else (EllipVar 0, [EllipRange
-                    { ident=0
-                    , var=""
-                    , ib=idxb
-                    , ie=idxe
-                    , contentT=BeIndices}])
-            (App t1b t2b, App t1e t2e)    -> let ((t1,t2),rs) = processTwoSides (t1b, t2b) (t1e, t2e) in (App t1 t2, rs)
-            (Add t1b t2b, Add t1e t2e)    -> let ((t1,t2),rs) = processTwoSides (t1b, t2b) (t1e, t2e) in (Add t1 t2, rs)
-            (Pair t1b t2b, Pair t1e t2e)  -> let ((t1,t2),rs) = processTwoSides (t1b, t2b) (t1e, t2e) in (Pair t1 t2, rs)
-            (Value v1, Value v2)          -> if v1 == v2 then (Value v1, []) else error "Unequal values in preEllips"
-            (t1, t2)                      -> trace ("Not implemented yet! " ++ show t1 ++ " ... " ++ show t2) (t1, []) -- error "Not implemented yet"
-    where
-    processTwoSides :: (Expr, Expr) -> (Expr, Expr) -> ((Expr, Expr), EllipRanges)
-    processTwoSides (t1b, t2b) (t1e, t2e) = let
-        (t1, rs1) = processPreEllipsis' t1b t1e
-        (t2, rs2) = processPreEllipsis' t2b t2e
-        in ((t1, t2), rs1 ++ rs2)
---     | toConstr tBegin /= toConstr tEnd = error "Unequal constructors in PreEllipsis!"
+processPreEllipsis' :: Expr -> Expr -> State (EllipRanges, Int) Expr
+processPreEllipsis' t1@(ListElement vb idxb) t2@(ListElement ve idxe)
+    | vb /= ve      = error $ "PreEllipsis: Unequal lists: "++pp t1++" ... "++pp t2
+    | idxb == idxe  = return t1
+    | otherwise     = do
+        (rs, id) <- get
+        let newRange = EllipRange { ident=id, var=ve, ib=idxb, ie=idxe, contentT=BeList}
+        put (newRange:rs, id+1)
+        return $ EllipVar id
+processPreEllipsis' t1@(Index idxb) t2@(Index idxe) 
+    | idxb == idxe  = return t1
+    | otherwise     = do
+        (rs, id) <- get
+        let newRange = EllipRange {ident=id, var="", ib=idxb, ie=idxe, contentT=BeIndices}
+        put (newRange:rs, id+1)
+        return $ EllipVar id
+processPreEllipsis' (App t1b t2b) (App t1e t2e)     = doTwo App (t1b, t2b) (t1e, t2e)
+processPreEllipsis' (Abstr vb tb) (Abstr ve te)     = if vb == ve 
+    then doOne (Abstr vb) tb te
+    else error $ "PreEllipsis: Unequal arguments: "++vb++ " ... "++ve
+processPreEllipsis' (Let vb tib tob) (Let ve tie toe) = if vb == ve
+    then doTwo (Let vb) (tib, tob) (tie, toe)
+    else error $ "PreEllipsis: Unequal let vars: "++vb++" ... "++ve
+processPreEllipsis' (Case _ _) (Case _ _) = error "PreEllipsis: Case not implemented"
+processPreEllipsis' (LetRec _ _ _) (LetRec _ _ _) = error "PreEllipsis: LetRec not implemented"
+processPreEllipsis' (Ellipsis tb rsb) (Ellipsis te rse) = 
+    trace "Warning: PreEllipsis: Nested ellipsis are currently awkward" $ 
+    if rsb == rse 
+        then doOne (`Ellipsis` rsb) tb te 
+        else error "PreEllipsis: Not equal ranges (This could be changed in the future)"
+processPreEllipsis' (Cons t1b t2b) (Cons t1e t2e)   = doTwo Cons (t1b, t2b) (t1e,t2e)
+processPreEllipsis' (Cat t1b t2b) (Cat t1e t2e)     = doTwo Cat (t1b, t2b) (t1e,t2e)
+processPreEllipsis' (Error s1) (Error s2)             = return $ Error s1
+processPreEllipsis' (Add t1b t2b) (Add t1e t2e)     = doTwo Add (t1b, t2b) (t1e, t2e)
+processPreEllipsis' (Pair t1b t2b) (Pair t1e t2e)   = doTwo Pair (t1b, t2b) (t1e, t2e)
+processPreEllipsis' t1 t2 = if t1 == t2 
+    then return t1 
+    else error $ "Not implemented: "++show t1++" ... "++show t2
+
+doTwo :: (Expr -> Expr -> Expr) -> (Expr, Expr) -> (Expr,Expr) -> State (EllipRanges, Int) Expr
+doTwo con (t1b, t2b) (t1e, t2e) = do
+    t1eval <- processPreEllipsis' t1b t1e
+    t2eval <- processPreEllipsis' t2b t2e
+    return $ con t1eval t2eval
+
+doOne :: (Expr -> Expr) -> Expr -> Expr -> State (EllipRanges, Int) Expr
+doOne con tb te = do
+    t <- processPreEllipsis' tb te
+    return $ con t
 
 getEllipsisIterators :: Env -> EllipRanges -> Env
 getEllipsisIterators e rs = Map.fromList $ map (IdVar . ident) rs `zip` map (getEllipsisIterator e) rs
@@ -1049,13 +1069,16 @@ myTest = Abstr "l" $ Case l -- of
         )
     ]
 
+pairAdjPreTerm1 = ListElement "x" (EPlace $ Value $ Con 1) `Pair` ListElement "x" (EPlace $ Value $ Con 2)
+pairAdjPreTerm2 = ListElement "x" (EPlace $ n `Sub` Value (Con 1)) `Pair` ListElement "x" (EPlace n)
+
 pairAdjPre :: Expr
 pairAdjPre = Abstr "l" $ Case l -- of
     [
         (PEllipsis "x" (End "n"),
-            ((ListElement "x" (EPlace $ Value $ Con 1)) `Pair` (ListElement "x" (EPlace $ Value $ Con 2)))
+            (ListElement "x" (EPlace $ Value $ Con 1) `Pair` ListElement "x" (EPlace $ Value $ Con 2))
             `PreEllipsis`
-            ((ListElement "x" (EPlace $ n `Sub` Value (Con 1))) `Pair` (ListElement "x" (EPlace n)))
+            (ListElement "x" (EPlace $ n `Sub` Value (Con 1)) `Pair` ListElement "x" (EPlace n))
             )
     ]
 
