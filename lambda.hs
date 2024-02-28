@@ -43,6 +43,8 @@ data Expr = Var Name                -- Variable
           | Mod Expr Expr
           | Abs Expr
           | EllipVar Id
+          | PreEllipsis Expr Expr
+          | Index Idx
           deriving (Eq, Show, Data)
 
 data Val    = Con Int 
@@ -191,7 +193,7 @@ eval e (Ellipsis t rs) = let
     if not (rangesCheck ellipEnv)
         then error $ "Unequal ranges in ellipEnv: " ++ show ellipEnv
     else if not (boundsCheck e ellipEnv)
-        then empty
+        then Empty
     else iterateEllipsis e ellipEnv t 
 
 eval e (Trace s tt t) = trace (s ++ ": " ++ ppVal (eval e tt)) $ eval e t
@@ -231,7 +233,47 @@ eval e (Not t) = case eval e t of
 
 eval e (EllipVar i)   = evalBinding e (e Map.! IdVar i)
 
--- eval e x              = errorOut e $ "Feature not implemented: " ++ show x
+eval e ell@(PreEllipsis _ _) = eval e $ processPreEllipsis ell
+
+eval e (Index idx)    = eval e $ idxToExpr idx
+
+processPreEllipsis :: Expr -> Expr
+processPreEllipsis (PreEllipsis t1 t2) = Ellipsis t rs
+    where
+    (t,rs) = processPreEllipsis' t1 t2
+processPreEllipsis _ = error "Trying to processPreEllipsis on non-preEllipsis"
+
+processPreEllipsis' :: Expr -> Expr -> (Expr, EllipRanges)
+processPreEllipsis' tBegin tEnd 
+    | tBegin == tEnd                   = (tBegin, [])
+    | otherwise                        = 
+        case (tBegin, tEnd) of
+            (ListElement vb idxb, ListElement ve idxe) -> if vb == ve then (EllipVar 0, [EllipRange 
+                { ident=0
+                , var=ve
+                , ib=idxb
+                , ie=idxe
+                , contentT=BeList }])
+                else error "Unequal variables in preEllips"
+            (Index idxb, Index idxe)          -> if idxb == idxe then (Index idxb, [])
+                else (EllipVar 0, [EllipRange
+                    { ident=0
+                    , var=""
+                    , ib=idxb
+                    , ie=idxe
+                    , contentT=BeIndices}])
+            (App t1b t2b, App t1e t2e)    -> let ((t1,t2),rs) = processTwoSides (t1b, t2b) (t1e, t2e) in (App t1 t2, rs)
+            (Add t1b t2b, Add t1e t2e)    -> let ((t1,t2),rs) = processTwoSides (t1b, t2b) (t1e, t2e) in (Add t1 t2, rs)
+            (Pair t1b t2b, Pair t1e t2e)  -> let ((t1,t2),rs) = processTwoSides (t1b, t2b) (t1e, t2e) in (Pair t1 t2, rs)
+            (Value v1, Value v2)          -> if v1 == v2 then (Value v1, []) else error "Unequal values in preEllips"
+            (t1, t2)                      -> trace ("Not implemented yet! " ++ show t1 ++ " ... " ++ show t2) (t1, []) -- error "Not implemented yet"
+    where
+    processTwoSides :: (Expr, Expr) -> (Expr, Expr) -> ((Expr, Expr), EllipRanges)
+    processTwoSides (t1b, t2b) (t1e, t2e) = let
+        (t1, rs1) = processPreEllipsis' t1b t1e
+        (t2, rs2) = processPreEllipsis' t2b t2e
+        in ((t1, t2), rs1 ++ rs2)
+--     | toConstr tBegin /= toConstr tEnd = error "Unequal constructors in PreEllipsis!"
 
 getEllipsisIterators :: Env -> EllipRanges -> Env
 getEllipsisIterators e rs = Map.fromList $ map (IdVar . ident) rs `zip` map (getEllipsisIterator e) rs
@@ -406,7 +448,7 @@ patternMatch e t (PCons' tl tls, t2) =
 valIsList :: Val -> Bool
 valIsList Empty         = True
 valIsList (VCons _ xs)  = valIsList xs
-valIsList _             = False
+valIsList v             = traceShow v False
 
 
 {-
@@ -513,6 +555,8 @@ pp' tabs (Not t)              = "!(" ++ pp' tabs t ++ ")"
 pp' tabs (Error s)            = "error " ++ s
 pp' tabs ellip@(Ellipsis _ _) = ppEllip ellip
 pp' tabs (EllipVar i)         = "EllipVar(" ++ show i ++ ")"
+pp' tabs (PreEllipsis t1 t2)  = pp' tabs t1 ++ " ... " ++ pp' tabs t2
+pp' tabs (Index idx)          = ppIdx idx
 -- pp' tabs _            = "Error -- cannot display expression"
 
 ppEllip :: Expr -> String
@@ -924,20 +968,14 @@ binSearch' = Abstr "list" $ Abstr "term" (LetRec "binSearch" (Abstr "l" $ Abstr 
                 (PVal $ Boolean True, Value $ Boolean True),
                 (PVal $ Boolean False, Case (ListElement "x" (End "k") `Gt` t)
                 [
-                    (PVal $ Boolean True, App (App 
-                        (Var "binSearch") 
-                        (ellipOne x0 
-                            (IPlace 1) 
-                            (EPlace $ Sub k (Value $ Con 1))
-                            "x")) 
-                        t),
-                    (PVal $ Boolean False, App (App
-                        (Var "binSearch")
-                        (ellipOne x0
-                            (EPlace $ Add k (Value $ Con 1)) 
-                            (End "n")
-                            "x"))
-                        t)
+                    (PVal $ Boolean True, 
+                              Var "binSearch" 
+                        `App` ellipOne x0 (IPlace 1) (EPlace $ k `Sub` Value (Con 1)) "x" 
+                        `App` t),
+                    (PVal $ Boolean False, 
+                              Var "binSearch"
+                        `App` ellipOne x0 (EPlace $ k `Add` Value (Con 1)) (End "n") "x"
+                        `App` t)
                 ])
             ]
         )
@@ -1001,4 +1039,23 @@ mergeSort' = Abstr "l" $ LetRec "mergeSort" -- =
 merge' :: Expr
 merge = Abstr "l1" $ Abstr "l2"
 -}
+
+myTest = Abstr "l" $ Case l -- of
+    [
+        (PEllipsis "x" (End "n"), 
+            (ListElement "x" (EPlace $ Value $ Con 1) `Add` Value (Con 1)) 
+            `PreEllipsis` 
+            (ListElement "x" (EPlace n) `Add` Value (Con 1))
+        )
+    ]
+
+pairAdjPre :: Expr
+pairAdjPre = Abstr "l" $ Case l -- of
+    [
+        (PEllipsis "x" (End "n"),
+            ((ListElement "x" (EPlace $ Value $ Con 1)) `Pair` (ListElement "x" (EPlace $ Value $ Con 2)))
+            `PreEllipsis`
+            ((ListElement "x" (EPlace $ n `Sub` Value (Con 1))) `Pair` (ListElement "x" (EPlace n)))
+            )
+    ]
 
