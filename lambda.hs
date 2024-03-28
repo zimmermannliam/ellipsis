@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 import Debug.Trace
 import Data.Maybe
 import Data.Generics
@@ -9,7 +11,6 @@ import qualified Data.Bifunctor
 import Control.Monad
 import Control.Monad.State
 
-{-# LANGUAGE DeriveDataTypeable #-}
 
 ---------------------------------------------------------------------------------
 -- SYNTAX
