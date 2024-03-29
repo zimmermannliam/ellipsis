@@ -1,4 +1,0 @@
-GHCi, version 9.0.2: https://www.haskell.org/ghc/  :? for help
-[1 of 1] Compiling Main             ( lambda.hs, interpreted )
-Ok, one module loaded.
-Leaving GHCi.
