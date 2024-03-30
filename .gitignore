@@ -1,2 +1,4 @@
 Session.vim
 dist-newstyle
+.vscode
+cabal.project.local

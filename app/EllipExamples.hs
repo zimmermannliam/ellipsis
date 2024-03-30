@@ -1,23 +1,38 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module EllipExamples where
 
 import EllipLang 
 import qualified Data.Map as Map
 
 
+exList' :: [Int]
 exList' = [1..5]
+exList2' :: [Int]
 exList2' = [8,14,32,0,4]
+exList3' :: [Int]
 exList3' = [1,2,13,24,25,45,64,84,99,100]
+exList4' :: [Int]
 exList4' = [1..10]
+exList5' :: [Int]
 exList5' = [1]
+exList6' :: [Int]
 exList6' = [1,2]
 
+myCons :: [Expr]
 myCons = map cons [exList', exList2', exList3', exList4', exList5', exList6']
+
+exList, exList2, exList3, exList4, exList5, exList6 :: Expr
 [exList, exList2, exList3, exList4, exList5, exList6] = myCons
+
+exListV, exList2V, exList3V, exList4V, exList5V, exList6V :: Val
 [exListV, exList2V, exList3V, exList4V, exList5V, exList6V] = map (eval prelude) myCons
 
 -- PRELUDE FUNCTIONS
 prelude :: Env
 prelude = Map.fromList [(NamedVar "cmp", BVal $ eval Map.empty cmp')]
+
+cmp :: Expr
 [cmp] = map Var ["cmp"]
 
 cmp' :: Expr
@@ -360,6 +375,7 @@ merge' :: Expr
 merge = Abstr "l1" $ Abstr "l2"
 -}
 
+myTest :: Expr
 myTest = Abstr "l" $ Case l -- of
     [
         (PEllipsis "x" (End "n"), 
@@ -369,7 +385,9 @@ myTest = Abstr "l" $ Case l -- of
         )
     ]
 
+pairAdjPreTerm1 :: Expr
 pairAdjPreTerm1 = ListElement "x" (EPlace $ Value $ Con 1) `Pair` ListElement "x" (EPlace $ Value $ Con 2)
+pairAdjPreTerm2 :: Expr
 pairAdjPreTerm2 = ListElement "x" (EPlace $ n `Sub` Value (Con 1)) `Pair` ListElement "x" (EPlace n)
 
 pairAdjPre :: Expr
@@ -382,6 +400,18 @@ pairAdjPre = Abstr "l" $ Case l -- of
             )
     ]
 
+{-
+enumeratePre :: Expr
+enumeratePre = Abstr "l" $ Case l -- of
+    [
+        (PEllipsis "x" (End "n"),
+            (ListElement "x" (EPlace $ Value $ Con 1) `Pair` List)
+        )
+    ]
+-}
+
+favorites :: [(String, Expr)]
 favorites = [("binSearch", binSearch'), ("pairAdj", pairAdj'), ("rotL", rotL')]
 
+printFavorites :: IO ()
 printFavorites = putStrLn $ foldl (\x y -> x++"\n\n"++y) "\nFavorite examples:" $ map (\(n, e) -> n ++ ": \n" ++ pp e) favorites

@@ -1,4 +1,9 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
 
 module EllipLang where
 
@@ -122,7 +127,7 @@ type Env                = Map.Map Identifier Bindee
 
 head' :: [a] -> a
 head' [] = error "Blah blah blah blah error"
-head' (x:xs) = x
+head' (x:_) = x
 
 -- y combinator
 -- \f.( (\x.(f (x x))) (\x.(f (x x))) )
@@ -272,7 +277,7 @@ processPreEllipsis' (Let vb tib tob) (Let ve tie toe) = if vb == ve
     then doTwo (Let vb) (tib, tob) (tie, toe)
     else error $ "PreEllipsis: Unequal let vars: "++vb++" ... "++ve
 processPreEllipsis' (Case _ _) (Case _ _) = error "PreEllipsis: Case not implemented"
-processPreEllipsis' (LetRec _ _ _) (LetRec _ _ _) = error "PreEllipsis: LetRec not implemented"
+processPreEllipsis' (LetRec {}) (LetRec {}) = error "PreEllipsis: LetRec not implemented"
 processPreEllipsis' (Ellipsis tb rsb) (Ellipsis te rse) = 
     trace "Warning: PreEllipsis: Nested ellipsis are currently awkward" $ 
     if rsb == rse 
@@ -343,7 +348,7 @@ rangesCheck ellipEnv = all (== head ranges) ranges
     where ranges = map (\it -> it_ie it - it_ib it) (Map.elems ellipEnv)
 
 boundsCheck :: Env -> Env -> Bool
-boundsCheck e ellipEnv = all ((== True) . boundsCheck' e) iterators
+boundsCheck e ellipEnv = all (boundsCheck' e) iterators
     where 
     iterators = Map.elems ellipEnv
     boundsCheck' :: Env -> Bindee -> Bool
