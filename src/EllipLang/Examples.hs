@@ -1,8 +1,9 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-module EllipExamples where
 
-import EllipLang 
+module EllipLang.Examples where
+
+import EllipLang.Syntax
+import EllipLang.Eval
 import qualified Data.Map as Map
 
 
@@ -409,9 +410,3 @@ enumeratePre = Abstr "l" $ Case l -- of
         )
     ]
 -}
-
-favorites :: [(String, Expr)]
-favorites = [("binSearch", binSearch'), ("pairAdj", pairAdj'), ("rotL", rotL')]
-
-printFavorites :: IO ()
-printFavorites = putStrLn $ foldl (\x y -> x++"\n\n"++y) "\nFavorite examples:" $ map (\(n, e) -> n ++ ": \n" ++ pp e) favorites

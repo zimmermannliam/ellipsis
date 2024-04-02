@@ -23,7 +23,7 @@ name:               ellipsis
 version:            0.1.0.0
 
 -- A short (one-line) description of the package.
-synopsis:           Functional programming language with ellipsis patterns
+synopsis:           Functional programming language with ellipsis patterns.
 
 -- A longer description of the package.
 -- description:
@@ -48,30 +48,30 @@ build-type:         Simple
 -- Extra doc files to be distributed with the package, such as a CHANGELOG or a README.
 extra-doc-files:    CHANGELOG.md
 
--- Extra source files to be distributed with the package, such as examples, or a tutorial module.
--- extra-source-files:
-
-common warnings
+common shared
     ghc-options: -Wall
-
-executable ellipsis
-    -- Import common warning flags.
-    import:           warnings
-
-    -- .hs or .lhs file containing the Main module.
-    main-is:          Main.hs
-
-    -- Modules included in this executable, other than Main.
-    -- other-modules:
-    other-modules:    EllipLang EllipExamples
-    -- LANGUAGE extensions used by modules in this package.
-    -- other-extensions:
-    other-extensions: 
-    -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.17.2.1, syb, containers, mtl
-
-    -- Directories containing source files.
-    hs-source-dirs:   app
-
-    -- Base language which the package is written in.
     default-language: Haskell2010
+    hs-source-dirs:   src
+    build-depends:    base ^>=4.17.2.1, syb, containers, mtl
+    other-extensions: 
+
+library EllipLang
+    import: shared
+    exposed-modules:
+        EllipLang.Examples
+    
+    other-modules:
+        EllipLang.Syntax
+        EllipLang.Eval
+        EllipLang.Pretty
+        EllipLang.Parser
+
+executable ellipc
+    import:           shared
+    main-is:          Main.hs
+    other-modules:
+        EllipLang.Syntax
+        EllipLang.Eval
+        EllipLang.Examples
+        EllipLang.Pretty
+        EllipLang.Parser
