@@ -2,3 +2,4 @@ Session.vim
 dist-newstyle
 .vscode
 cabal.project.local
+cabal.project.local~
