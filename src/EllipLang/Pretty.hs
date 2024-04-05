@@ -109,7 +109,7 @@ ppVal Empty       = "[]"
 ppVal (Closure n t e)   = "CLOSURE"-- "CLOSURE( " ++ ppEnv e ++ "|-" ++ pp (Abstr n t) ++ ")"
 ppVal (FreeVar n)   = n
 ppVal (VPair v1 v2) = "(" ++ ppVal v1 ++ ", " ++ ppVal v2 ++ ")"
-ppVal (Boolean b)   = if b then "True" else "False"
+ppVal (Boolean b)   = if b then "true" else "false"
 ppVal _             = "Error"
 
 ppVCons :: Val -> String
