@@ -4,32 +4,35 @@
     "type": "split",
     "children": [
       {
-        "id": "817352daa1b83fdf",
+        "id": "a1634fd58a8f1ac6",
         "type": "tabs",
         "children": [
           {
-            "id": "97a99d1cc4593c19",
+            "id": "914cd4ff5e33fffa",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {}
+              "type": "markdown",
+              "state": {
+                "file": "daily/2024-04-14.md",
+                "mode": "source",
+                "source": false
+              }
             }
-          }
-        ]
-      },
-      {
-        "id": "4b5ac132878b1245",
-        "type": "tabs",
-        "children": [
+          },
           {
-            "id": "8cab0f06a3e8f589",
+            "id": "d7b4c9bae315f96f",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {}
+              "type": "markdown",
+              "state": {
+                "file": "Favorites.md",
+                "mode": "source",
+                "source": false
+              }
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -95,6 +98,7 @@
             "state": {
               "type": "backlink",
               "state": {
+                "file": "Favorites.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -111,6 +115,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
+                "file": "Favorites.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -133,7 +138,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Welcome.md"
+                "file": "Favorites.md"
               }
             }
           }
@@ -154,8 +159,24 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "85fb671469709ec3",
+  "active": "d7b4c9bae315f96f",
   "lastOpenFiles": [
+    "daily/2024-04-14.md",
+    "Favorites.md",
+    "Combinations.canvas",
+    "daily/2024-04-11.md",
+    "daily/2024-04-09.md",
+    "Untitled.md",
+    "Todo.md",
+    "daily/2024-04-05.md",
+    "daily/2024-04-08.md",
+    "Meeting 2024-4ish.md",
+    "daily/template.md",
+    "Parser.md",
+    "New Text Document.txt",
+    "Meeting 2024.md",
+    "daily/Untitled.md",
+    "daily",
     "Welcome.md"
   ]
 }

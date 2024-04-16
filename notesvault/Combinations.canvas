@@ -1,0 +1,13 @@
+{
+	"nodes":[
+		{"id":"935c593adf67b811","type":"text","text":"Email Erwig regarding zipN","x":-443,"y":-120,"width":286,"height":50},
+		{"id":"822613586dc4215b","type":"text","text":"Make this work:\n```\ncombinations [x!1 ... x!n] [y!1 ... y!m] =\n\t[(x!1, y!1) ... (x!1, y!m)] ... [(x!n, y!1) ... (x!n, y!m)]\n```","x":-660,"y":-360,"width":720,"height":160},
+		{"id":"793accde19db0d18","type":"text","text":"```\ncombinations [x!1 ... x!n] [y!1 ... y!m] =\n\t[(x!1, y!1) ... (x!1, y!m)] ++ ... ++ [(x!n, y!1) ... (x!n, y!m)]\n```","x":-107,"y":-113,"width":707,"height":133},
+		{"id":"2d8cb372cbdd670e","x":247,"y":-420,"width":250,"height":60,"type":"text","text":"Fold"}
+	],
+	"edges":[
+		{"id":"7222112f25ba26ac","fromNode":"822613586dc4215b","fromSide":"bottom","toNode":"935c593adf67b811","toSide":"top"},
+		{"id":"5e2e0eecfd5b8b22","fromNode":"822613586dc4215b","fromSide":"bottom","toNode":"793accde19db0d18","toSide":"top"},
+		{"id":"181d054f9bdeaf72","fromNode":"2d8cb372cbdd670e","fromSide":"bottom","toNode":"793accde19db0d18","toSide":"top"}
+	]
+}

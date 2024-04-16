@@ -1,0 +1,23 @@
+{
+  "activateOnlyOnCodeBlocks": false,
+  "indentsIfSelection": true,
+  "indentsIfSelectionOnlyForMultipleLines": true,
+  "useSpaces": true,
+  "alignSpaces": true,
+  "useHardSpace": false,
+  "spacesCount": 4,
+  "allowException": false,
+  "exceptionRegex": "^[\\s ]*(-|\\d+\\.)( \\[ \\])?\\s*$",
+  "useAdvancedTables": false,
+  "obsidianTableEditor": false,
+  "useOutlinerBetterTab": false,
+  "hotkey": "Tab",
+  "language": "auto",
+  "developerMode": false,
+  "enableBracesAutoIndent": true,
+  "braceCodeSetOpen": "[\"\\\\{$\", \"\\\\[$\", \"\\\\($\", \"\\\"$\", \"'$\", \"`$\"]",
+  "braceCodeSetClose": "[\"^\\\\}\", \"^\\\\]\", \"^\\\\)\", \"^\\\"\", \"^'\", \"^`\"]",
+  "braceMarkdownSetOpen": "[\"\\\\{$\", \"\\\\[$\", \"\\\\($\", \"\\\"$\", \"'$\", \"\\\\$\\\\$$\", \"<.+>$\", \"¡$\", \"¿$\"]",
+  "braceMarkdownSetClose": "[\"^\\\\}\", \"^\\\\]\", \"^\\\\)\", \"^\\\"\", \"^'\", \"^\\\\$\\\\$\", \"^<\\\\/\\\\w+>\", \"^!\", \"^?\"]",
+  "indentCharacters": " \t"
+}
