@@ -1,4 +1,5 @@
 import Debug.Trace
+import Data.Function (&)
 
 map' :: [Int] -> (Int -> Int) -> [Int]
 map' [] _       = []
@@ -86,3 +87,45 @@ binSearch l t   = case l of
                             1   -> let newl = (fst $ splitAt (k-1) l) in binSearch newl t
                             -1  -> let newl = (snd $ splitAt (k+1) l) in binSearch newl t
                             _   -> error "bad cmp"
+
+
+unSum :: Int -> Maybe (Int, Int)
+unSum 0 = Nothing
+unSum x = Just (1, x-1)
+
+
+data Expr = Cons Expr Expr
+          | Val Int
+          | Empty
+          deriving (Eq, Show)
+
+unExpr :: Expr -> Maybe (Expr, Expr)
+unExpr (Cons x xs)  = Just (x, xs)
+unExpr Empty        = Nothing
+unExpr _            = error "wtf"
+
+intuitiveButWrongZip :: [a] -> [b] -> [(a,b)]
+intuitiveButWrongZip xs ys = [(x,y) | x <- xs, y <- ys]
+
+betwixt :: Int -> Int -> [a] -> [a]
+betwixt begin end l = drop (begin-1) $ take end l
+
+ellipsis1 :: [a] -> (Int -> a -> pf) -> (Int -> Int) -> (Int -> Int) -> (pf -> out -> out) -> out -> out
+ellipsis1 xs f getBegin getEnd folder foldLast = 
+    let n = length xs
+        begin = getBegin n
+        end = getEnd n
+        xs' = betwixt begin end (zip [1..] xs)
+        xs'' = map (uncurry f) xs'
+    in foldr folder foldLast xs''
+
+
+combinations' :: [a] -> [b] -> [(a, b)]
+combinations' xs ys = foldr (++) [] [(x, y) | x <- xs | y <- ys]
+
+
+combinations :: [a] -> [b] -> [(a, b)]
+combinations xs ys = 
+
+-- combinations [x_1 ... x_n] [y_1 ... y_m] = 
+--    [(x_1, y_1) ... (x_1, y_m)] ... [(x_n, y_1) ... (x_n, y_m)]

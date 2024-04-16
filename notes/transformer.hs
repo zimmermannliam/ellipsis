@@ -15,3 +15,5 @@ length' l = length l
 map' :: (a -> b) -> [a] -> [b]
 map' f xs = foldr (\y ys -> (f y):ys) [] xs
 -- foldr or map
+
+zip' :: [a] -> [b] -> [(a, b)]
