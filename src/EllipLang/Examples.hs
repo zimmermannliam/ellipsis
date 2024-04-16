@@ -1,9 +1,13 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module EllipLang.Examples where
 
 import EllipLang.Syntax
 import EllipLang.Eval
+import EllipLang.Parser
+import EllipLang.Pretty
 import qualified Data.Map as Map
 
 
@@ -401,12 +405,98 @@ pairAdjPre = Abstr "l" $ Case l -- of
             )
     ]
 
-{-
 enumeratePre :: Expr
 enumeratePre = Abstr "l" $ Case l -- of
     [
         (PEllipsis "x" (End "n"),
-            (ListElement "x" (EPlace $ Value $ Con 1) `Pair` List)
+            ((ListElement "x" (EPlace $ Value $ Con 1))
+            `Pair`
+            (Index $ EPlace $ Value $ Con 1))
+            `PreEllipsis`
+            ((ListElement "x" (EPlace $ Var "n"))
+            `Pair`
+            (Index $ EPlace $ Var "n"))
         )
     ]
--}
+
+zipPre' :: Expr
+zipPre' = Abstr "xs" $ Abstr "ys" $ Case xs -- of
+    [(PEllipsis "x" (End "n"),
+        Case ys -- of
+            [(PEllipsis "y" (End "m"),
+                ((ListElement "x" $ EPlace $ Value $ Con 1)
+                `Pair`
+                (ListElement "y" $ EPlace $ Value $ Con 1))
+                `PreEllipsis`
+                ((ListElement "x" $ EPlace $ Var "n")
+                `Pair`
+                (ListElement "y" $ EPlace $ Var "n"))
+            )]
+    )]
+
+zipPre :: Expr
+zipPre = Abstr "xs" $ Abstr "ys" $ Case xs -- of
+    [(PEllipsis "x" (End "n"),
+        Case ys -- of
+            [(PEllipsis "y" (End "m"),
+                ((x !. 1) <+> (y !. 1)) <...> ((x ! n) <+> (y ! m))
+            )]
+    )]
+
+{-
+combinations (x[1] ... x[n]) (y[1] ... y[m]) = 
+    [(x[1], y[1]) ... (x[1], y[m])] ++ ... ++ [(x[n], y[1]) ... (x[n], y[m])]
+-} 
+
+
+combinations :: Expr
+combinations = Abstr "xs" $ Abstr "ys" $ Case xs -- of
+    [(PEllipsis "x" (End "n"),
+        Case ys -- of
+            [(PEllipsis "y" (End "m"),
+                (((x !. 1) <+> (y !. 1)) <...> ((x !. 1) <+> (y ! m)))
+                <...>
+                (((x ! n) <+> (y !. 1)) <...> ((x ! n) <+> (y ! m)))
+            )]
+    )]
+
+testEllip :: Expr
+testEllip = Abstr "xs" $ Case xs -- of
+    [(PEllipsis "x" (End "n"),
+        (x!.1 `Add` inte 1) <...> (x!n `Add` inte 1)
+    )]
+
+sublists' :: Expr
+sublists' = Abstr "list" $
+    LetRec "sublists" (Abstr "xs" $ Case xs -- of
+    [
+    (PVal Empty, Value Empty),
+    (PEllipsis "x" (End "n"),
+        ((x!.1 <...> x!.1) <...> (x!.1 <...> x!n))
+        `Cat` 
+        App (Var "sublists") (x!.2 <...> x!n)
+    )])
+    --in
+    (App (Var "sublists") (Var "list"))
+
+pairWithHead :: Expr
+pairWithHead = Abstr "xs" $ Case xs -- of
+    [(PEllipsis "x" (End "n"),
+        ((x!.1) `Pair` (x!.2))
+        <...>
+        ((x!.1) `Pair` (x!n))
+    )]
+
+inits' :: Expr
+inits' = Abstr "xs" $ Case xs -- of
+    [(PEllipsis "x" (End "n"),
+        (x!.1 <...> x!.1)
+        <...>
+        (x!.1 <...> x!n)
+    )]
+
+rotL2 :: Expr
+rotL2 = Abstr "k" $ Abstr "xs" $ Case xs -- of
+    [(PEllipsis "x" (End "n"), 
+        (x!(k `Add` inte 1) <...> x!n) `Cat` (x!.1 <...> x!k)
+    )]

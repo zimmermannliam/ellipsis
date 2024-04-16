@@ -19,6 +19,7 @@ import qualified Data.Map as Map
 import qualified Data.Bifunctor
 import Control.Monad
 import Control.Monad.State
+import Data.Function ((&))
 
 ------------------------------------------------------------------------
 -- Semantics
@@ -29,7 +30,7 @@ eval :: Env -> Expr -> Val
 
 -- Lambda Calculus
 eval e (Var vn) = evalBinding e (envLookup e vn)
-eval e (App t1 t2) = case eval e t1 of 
+eval e (App t1 t2) = case eval e t1 of
     Closure x t1b e2 -> eval (Map.insert (NamedVar x) (BVal $ eval e t2) e2) t1b
     _           -> errorOut e "Expected fn to be applied"
 eval e (Abstr x t) = Closure x t e
@@ -46,23 +47,23 @@ eval e (LetRec n t1 t2) = case eval e t1 of
 -- Ellipsis/list operators
 eval e (ListElement n i) = findListFutureElement e (envLookup e n) i
 eval e (EllipVar i)   = evalBinding e (e Map.! IdVar i)
-eval e ell@(PreEllipsis _ _) = eval e $ processPreEllipsis ell
+eval e ell@(PreEllipsis _ _) = eval e $ processPreEllipsis e ell
 eval e (Index idx)    = eval e $ idxToExpr idx
-eval e (Ellipsis t rs) = let 
+eval e (Ellipsis t rs) = let
     ellipEnv = getEllipsisIterators e rs
     in
     if not (rangesCheck ellipEnv)
         then error $ "Unequal ranges in ellipEnv: " ++ show ellipEnv
     else if not (boundsCheck e ellipEnv)
         then Empty
-    else iterateEllipsis e ellipEnv t 
+    else iterateEllipsis e ellipEnv t
 
 -- Built in type constructors
 eval e (Cons t1 t2) = VCons (eval e t1) (eval e t2)
 eval e (Pair t1 t2) = VPair (eval e t1) (eval e t2)
 
 -- Remove me
-eval e (Cat t1 t2)    = 
+eval e (Cat t1 t2)    =
     let et1 = eval e t1
         et2 = eval e t2
     in case (et1, et2) of
@@ -121,11 +122,49 @@ eval e (Abs t) = case eval e t of
     (Con i)             -> Con (abs i)
     _                   -> errorOut' e "Bad abs term"
 
-processPreEllipsis :: Expr -> Expr
-processPreEllipsis (PreEllipsis t1 t2) = Ellipsis t rs
+traceWith :: (a -> String) -> a -> a
+traceWith f t = t
+-- traceWith f t = trace (f t) t
+
+processPreEllipsis :: Env -> Expr -> Expr
+processPreEllipsis e (PreEllipsis t1 t2) = traceWith (pp) $ Ellipsis t rs
     where
-    (t,(rs,_)) = runState (processPreEllipsis' t1 t2) ([],0)
-processPreEllipsis _ = error "Trying to processPreEllipsis on non-preEllipsis"
+    (pre_rs, pre_t) = extractStates e
+    (t,(rs',_)) = runState (processPreEllipsis' t1 t2) (pre_rs, pre_t)
+    rs = rs' \\ pre_rs
+processPreEllipsis _ _ = error "Trying to processPreEllipsis on non-preEllipsis"
+
+extractStates :: Env -> (EllipRanges, Int)
+extractStates e = let 
+    isIterator :: Bindee -> Bool
+    isIterator (BIterator {}) = True
+    isIterator _              = False
+    rs = e  & Map.filter isIterator
+            & Map.toList 
+            & map (\(IdVar identifier, BIterator {it_ie=it_ie, it_ic=it_ic, vname=vname, content=content}) 
+                -> EllipRange {
+                    ident=identifier, 
+                    var=vname, 
+                    ib=IPlace it_ic, 
+                    ie=IPlace it_ie, 
+                    contentT=if content == Indices then BeIndices else BeList
+                })
+    nextI = 1 + foldr (max . ident) (-1) rs
+    in (rs,nextI)
+
+mergeEllipVars :: Id -> Id -> State (EllipRanges, Int) Expr
+mergeEllipVars ib' ie' = return (EllipVar ib')
+    {-
+    (rs, _) <- get
+    let rb = rangesLookup rs ib'
+    let re = rangesLookup rs ie'
+    if rb `rangesEq` re then return (EllipVar ib')
+    else error "Bad ellip vars!"
+    where
+        rangesEq :: EllipRange -> EllipRange -> Bool
+        rangesEq EllipRange {var=varl, ib=ibl, ie=iel} EllipRange {var=varr, ib=ibr, ie=ier} =
+            varl==varr && ibl==ibr && iel==ier
+            -}
 
 processPreEllipsis' :: Expr -> Expr -> State (EllipRanges, Int) Expr
 processPreEllipsis' t1@(ListElement vb idxb) t2@(ListElement ve idxe)
@@ -136,15 +175,20 @@ processPreEllipsis' t1@(ListElement vb idxb) t2@(ListElement ve idxe)
         let newRange = EllipRange { ident=id, var=ve, ib=idxb, ie=idxe, contentT=BeList}
         put (newRange:rs, id+1)
         return $ EllipVar id
-processPreEllipsis' t1@(Index idxb) t2@(Index idxe) 
+
+processPreEllipsis' t1@(Index idxb) t2@(Index idxe)
     | idxb == idxe  = return t1
     | otherwise     = do
         (rs, id) <- get
         let newRange = EllipRange {ident=id, var="", ib=idxb, ie=idxe, contentT=BeIndices}
         put (newRange:rs, id+1)
         return $ EllipVar id
+
+processPreEllipsis' (PreEllipsis t1b t2b) (PreEllipsis t1e t2e) 
+    = doTwo PreEllipsis (t1b, t2b) (t1e, t2e)
+
 processPreEllipsis' (App t1b t2b) (App t1e t2e)     = doTwo App (t1b, t2b) (t1e, t2e)
-processPreEllipsis' (Abstr vb tb) (Abstr ve te)     = if vb == ve 
+processPreEllipsis' (Abstr vb tb) (Abstr ve te)     = if vb == ve
     then doOne (Abstr vb) tb te
     else error $ "PreEllipsis: Unequal arguments: "++vb++ " ... "++ve
 processPreEllipsis' (Let vb tib tob) (Let ve tie toe) = if vb == ve
@@ -152,18 +196,37 @@ processPreEllipsis' (Let vb tib tob) (Let ve tie toe) = if vb == ve
     else error $ "PreEllipsis: Unequal let vars: "++vb++" ... "++ve
 processPreEllipsis' (Case _ _) (Case _ _) = error "PreEllipsis: Case not implemented"
 processPreEllipsis' (LetRec {}) (LetRec {}) = error "PreEllipsis: LetRec not implemented"
-processPreEllipsis' (Ellipsis tb rsb) (Ellipsis te rse) = 
-    trace "Warning: PreEllipsis: Nested ellipsis are currently awkward" $ 
-    if rsb == rse 
-        then doOne (`Ellipsis` rsb) tb te 
+processPreEllipsis' (Ellipsis tb rsb) (Ellipsis te rse) =
+    trace "Warning: PreEllipsis: Nested ellipsis are currently awkward" $
+    if rsb == rse
+        then doOne (`Ellipsis` rsb) tb te
         else error "PreEllipsis: Not equal ranges (This could be changed in the future)"
 processPreEllipsis' (Cons t1b t2b) (Cons t1e t2e)   = doTwo Cons (t1b, t2b) (t1e,t2e)
 processPreEllipsis' (Cat t1b t2b) (Cat t1e t2e)     = doTwo Cat (t1b, t2b) (t1e,t2e)
 processPreEllipsis' (Error s1) (Error s2)             = return $ Error s1
 processPreEllipsis' (Add t1b t2b) (Add t1e t2e)     = doTwo Add (t1b, t2b) (t1e, t2e)
 processPreEllipsis' (Pair t1b t2b) (Pair t1e t2e)   = doTwo Pair (t1b, t2b) (t1e, t2e)
-processPreEllipsis' t1 t2 = if t1 == t2 
-    then return t1 
+processPreEllipsis' (EllipVar ib') (EllipVar ie')     = mergeEllipVars ib' ie'
+processPreEllipsis' (EllipVar idb') (ListElement ve idxe) = do
+    (rs, id) <- get
+    let rb = rangesLookup rs idb'
+    let newRange = EllipRange {ident=id, var=ve, ib=(ib rb), ie=idxe, contentT=BeList}
+    put (newRange:rs, id+1)
+    if var rb /= ve
+        then error "EllipVar ... ListElement with different lists" 
+        else return $ EllipVar id
+
+processPreEllipsis' (ListElement vb idxb) (EllipVar ide')  = do
+    (rs, id) <- get
+    let re = rangesLookup rs ide'
+    let newRange = EllipRange {ident=id, var=vb, ib=idxb, ie=ib re, contentT=BeList}
+    put (newRange:rs, id+1)
+    if var re /= vb
+        then error "ListElement ... EllipVar with different lists" 
+        else return $ EllipVar id
+
+processPreEllipsis' t1 t2 = if t1 == t2
+    then return t1
     else error $ "Not implemented: "++show t1++" ... "++show t2
 
 doTwo :: (Expr -> Expr -> Expr) -> (Expr, Expr) -> (Expr,Expr) -> State (EllipRanges, Int) Expr
@@ -184,28 +247,27 @@ getEllipsisIterators e rs = Map.fromList $ map (IdVar . ident) rs `zip` map (get
     getEllipsisIterator e EllipRange {ib=ib, ie=ie, var=var, contentT=contentT} = BIterator {
         it_ib = ib_int,
         it_ie = ie_int,
-        it_ic = ib_int, 
+        it_ic = ib_int,
         vname = var,
         content = case contentT of
-            BeList      -> List $ drop (ib_int - 1) $ vConsToList (evalBinding e (ListFuture var))
+            BeList      -> List $ drop (ib_int - 1) $ unVCons (evalBinding e (ListFuture var))
             BeIndices   -> Indices
         }
             where
             ib_int = idxToInt e ib
             ie_int = idxToInt e ie
 
-vConsToList :: Val -> [Val]
-vConsToList (VCons x xs)= x:vConsToList xs
-vConsToList Empty       = []
-vConsToList _           = error "Tried to convert a non-vcons to list"
 
 iterateEllipsis :: Env -> Env -> Expr -> Val
 iterateEllipsis e ellipEnv t = foldr VCons Empty $ iterateEllipsis' e ellipEnv t range
     where
-    range = (\it -> 1 + it_ie it - it_ib it) $ head $ Map.elems ellipEnv
+    range = if ellipEnv == Map.empty 
+        then 1
+        else (\it -> 1 + it_ie it - it_ib it) $ head $ Map.elems ellipEnv
     iterateEllipsis' :: Env -> Env -> Expr -> Int -> [Val]
     iterateEllipsis' _ _ _ 0 = []
-    iterateEllipsis' e ellipEnv t cd = eval (e `Map.union` ellipEnv) t:iterateEllipsis' e (advanceIts ellipEnv) t (cd-1)
+    iterateEllipsis' e ellipEnv t cd = 
+        eval (e `Map.union` ellipEnv) t:iterateEllipsis' e (advanceIts ellipEnv) t (cd-1)
 
 advanceIts :: Env -> Env
 advanceIts = Map.map advanceIt
@@ -221,13 +283,18 @@ rangesCheck :: Env -> Bool
 rangesCheck ellipEnv = all (== head ranges) ranges
     where ranges = map (\it -> it_ie it - it_ib it) (Map.elems ellipEnv)
 
+rangesLookup :: EllipRanges -> Id ->  EllipRange
+rangesLookup rs i = fromMaybe
+    (error $ "Could not find i: " ++ show i ++ " in ranges: " ++ show rs)
+    (find (\r -> i == ident r) rs)
+
 boundsCheck :: Env -> Env -> Bool
 boundsCheck e ellipEnv = all (boundsCheck' e) iterators
-    where 
+    where
     iterators = Map.elems ellipEnv
     boundsCheck' :: Env -> Bindee -> Bool
-    boundsCheck' e BIterator { it_ie=it_ie, it_ib=it_ib, content=content} = it_ie >= it_ib 
-        && it_ib > 0 
+    boundsCheck' e BIterator { it_ie=it_ie, it_ib=it_ib, content=content} = it_ie >= it_ib
+        && it_ib > 0
         && (case content of
             List l -> it_ie - it_ib <= length l
             _ -> True)
@@ -272,10 +339,10 @@ idxToExpr (End n)    = Var n
 
 findListFutureElement :: Env -> Bindee -> Idx -> Val
 findListFutureElement e (ListFuture n) i = findNthElement
-        (evalBinding e (envLookup e n) ) 
+        (evalBinding e (envLookup e n) )
         intIdx
     where   findNthElement :: Val -> Int -> Val
-            findNthElement (VCons x xs) i    
+            findNthElement (VCons x xs) i
                 | i == 1    = x
                 | i > 1     = findNthElement xs (i - 1)
                 -- | i == 0    = Empty
@@ -309,7 +376,7 @@ valEvalInt (Con t)  = t
 valEvalInt _        = error "Expected integer"
 
 -- Match all alternatives vs Expr
-patternMatchEval :: Env -> Expr -> Alts -> Val 
+patternMatchEval :: Env -> Expr -> Alts -> Val
 patternMatchEval e t (p:ps) = case patternMatch e t p of
                                 Nothing     -> patternMatchEval e t ps
                                 Just v      -> v
@@ -322,8 +389,8 @@ patternMatch e t (PVal k, t2)             = if eval e t == k then Just $ eval e 
 patternMatch e t (PCons n ns, t2)         = case eval e t of
                                                 VCons x xs  -> Just $ eval (Map.fromList [(NamedVar n, BVal x),(NamedVar ns,BVal xs)] `Map.union` e) t2
                                                 _           -> Nothing
-patternMatch e t (PVar n, t2)             = Just $ eval (Map.insert (NamedVar n) (BVal $ eval e t) e) t2 
-patternMatch e t (PEllipsis n i, t2)      = let 
+patternMatch e t (PVar n, t2)             = Just $ eval (Map.insert (NamedVar n) (BVal $ eval e t) e) t2
+patternMatch e t (PEllipsis n i, t2)      = let
     list = eval e t
     n_idx = case i of
         (End n) -> n
@@ -344,7 +411,7 @@ patternMatch e t (PCons' tl tls, t2) =
         (vl',        FreeVar nls, VCons x xs) -> if vl' == x then Just $ eval (Map.insert (NamedVar nls) (BVal xs) e) t2 else Nothing
         (vl',        vls',        VCons x xs) -> if vl' == x && vls' == xs then Just $ eval e t2 else Nothing
         (_,          _,           _         ) -> Nothing
-        
+
 -- patternMatch e t _                        = Nothing
 
 valIsList :: Val -> Bool
@@ -382,14 +449,14 @@ evalBinding e (BIterator {it_ic=ic, content=c}) = case c of
 -- SMART CONSTRUCTORS
 ------------------------------------------------------------------------
 
-[f,x,n,l,r,m,k,t,y,k'] = map Var ["f","x","n","l","r","m","k","t","y","k'"]
+[f,x,n,l,r,m,k,t,y,k',xs,ys] = map Var ["f","x","n","l","r","m","k","t","y","k'","xs","ys"]
 [x0,x1,x2] = map EllipVar [0,1,2]
 
 con :: Int -> Expr
 con i = Value $ Con i
 
 cons :: [Int] -> Expr
-cons l = foldr1 Cons (map con l ++ [Value Empty]) 
+cons l = foldr1 Cons (map con l ++ [Value Empty])
 
 ellipOne :: Expr -> Idx -> Idx -> Name -> Expr
 ellipOne t ib ie n = Ellipsis t [EllipRange {var=n, ident=0, ib=ib, ie=ie, contentT = BeList}]
@@ -397,29 +464,44 @@ ellipOne t ib ie n = Ellipsis t [EllipRange {var=n, ident=0, ib=ib, ie=ie, conte
 -- y combinator
 -- \f.( (\x.(f (x x))) (\x.(f (x x))) )
 ycomb :: Expr
-ycomb = Abstr "f" $ 
-            App (Abstr "x" $ App (Var "f" ) (App (Var "x") (Var "x"))) 
+ycomb = Abstr "f" $
+            App (Abstr "x" $ App (Var "f" ) (App (Var "x") (Var "x")))
                 (Abstr "x" $ App (Var "f" ) (App (Var "x") (Var "x")))
 
 listToVCons :: [Val] -> Val
 listToVCons  = foldr VCons Empty
 
-vConsHead :: Val -> Val
-vConsHead (VCons x _) = x
-vConsHead Empty       = Empty
-vConsHead _           = error "Tried to vConsHead non-VCons"
+listToCons :: [Expr] -> Expr
+listToCons = foldr Cons (Value Empty)
 
-vConsTail :: Val -> Val
-vConsTail (VCons _ xs) = xs
-vConsTail Empty       = Empty
-vConsTail _           = error "Tried to vConsTail non-VCons"
+unCons :: Expr -> [Expr]
+unCons = unfoldr unCons'
+    where
+    unCons' :: Expr -> Maybe (Expr, Expr)
+    unCons' (Value Empty)   = Nothing
+    unCons' (Cons t1 t2)    = Just (t1, t2)
+    unCons' t               = error $ "Unexpected unCons': " ++ show t
 
-consHead :: Expr -> Expr
-consHead (Cons x _) = x
-consHead (Value Empty)     = Value Empty
-consHead _           = error "Tried to consHead non-Cons"
+unVCons :: Val -> [Val]
+unVCons = unfoldr unVCons'
+    where
+    unVCons' :: Val -> Maybe (Val, Val)
+    unVCons' Empty          = Nothing
+    unVCons' (VCons v1 v2)  = Just (v1, v2)
+    unVCons' v              = error $ "Unexpected unVCons': " ++ show v
 
-consTail :: Expr -> Expr
-consTail (Cons _ xs) = xs
-consTail (Value Empty)     = Value Empty
-consTail _           = error "Tried to consTail non-Cons"
+(!.) :: Expr -> Int -> Expr
+(Var n) !. i = ListElement n $ EPlace $ Value $ Con i
+
+(!) :: Expr -> Expr -> Expr
+(Var n) ! t = ListElement n (EPlace t)
+
+(<+>) :: Expr -> Expr -> Expr
+t1 <+> t2 = t1 `Pair` t2
+
+(<...>) :: Expr -> Expr -> Expr
+t1 <...> t2 = t1 `PreEllipsis` t2
+infix 1 <...>
+
+inte :: Int -> Expr
+inte i = Value $ Con i
