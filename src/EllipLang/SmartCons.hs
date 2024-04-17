@@ -1,6 +1,7 @@
 module EllipLang.SmartCons where
 
 import Data.List (unfoldr)
+import Data.Function ((&))
 
 import EllipLang.Syntax
 
@@ -34,6 +35,12 @@ listToVCons  = foldr VCons Empty
 
 listToCons :: [Expr] -> Expr
 listToCons = foldr Cons (Value Empty)
+
+vPairVCons :: [(Int, Int)] -> Val
+vPairVCons xs = 
+    xs
+        & map (\(l,r) -> VPair (Con l) (Con r))
+        & foldr VCons Empty
 
 unCons :: Expr -> [Expr]
 unCons = unfoldr unCons'

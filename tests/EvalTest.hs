@@ -122,13 +122,31 @@ testEval = map (\(l, t, expectedV) -> "eval" ~: l ~: eval Map.empty t ~?= expect
             & foldr VCons Empty)
 
     , ("removeKth [8,14,32,0,4] 3",
-        removeKth `App` exList2 `App` 3,
+        removeKth `App` exList2 `App` inte 3,
         vcons [8,14,0,4])
     , ("removeKth [8,14,32,0,4] 1",
-        removeKth `App` exList2 `App` 1,
+        removeKth `App` exList2 `App` inte 1,
         vcons [14,32,0,4])
     , ("removeKth [8,14,32,0,4] 5",
-        removeKth `App` exList2 `App` 5,
+        removeKth `App` exList2 `App` inte 5,
         vcons [8,14,32,0])
         -- oob?
+
+    , ("pairAdj [1,2,3,4,5]",
+        pairAdj `App` exList,
+        let xs = exList'
+        in zip xs (tail xs) & vPairVCons)
+    , ("pairAdj [8,14,32,0,4]",
+        pairAdj `App` exList2,
+        let xs = exList2'
+        in zip xs (tail xs) & vPairVCons)
+    , ("pairAdj [1]",
+        pairAdj `App` exList5,
+        let xs = exList5'
+        in zip xs (tail xs) & vPairVCons)
+    , ("pairAdj [1,2]",
+        pairAdj `App` exList6,
+        let xs = exList6'
+        in zip xs (tail xs) & vPairVCons)
+
     ]

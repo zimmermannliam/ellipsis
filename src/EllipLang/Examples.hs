@@ -116,6 +116,11 @@ rotL = xs <.> k <.> case1 xs (
         (x!(k' `Add` inte 1) <...> x!n) `Cat` (x!.1 <...> x!k')
     )
 
+pairAdj :: Expr
+pairAdj = xs <.> case1 xs (
+    (x, 1) <..> (x, n)  ==> (x!.1 `Pair` x!.2) <...> (x!(n `Sub` inte 1) `Pair` x!n)
+    )
+
 {-
 subArrays' :: Expr
 subArrays' = Abstr "l" $ Abstr "k" $ Case l -- of
