@@ -6,9 +6,6 @@
 
 module EllipLang.Eval where
 
-import EllipLang.Syntax
-import EllipLang.Pretty (pp, ppVal, ppEnv)
-
 import Debug.Trace
 import Data.Maybe
 import Data.Generics
@@ -20,6 +17,11 @@ import qualified Data.Bifunctor
 import Control.Monad
 import Control.Monad.State
 import Data.Function ((&))
+
+import EllipLang.Syntax
+import EllipLang.Pretty (pp, ppVal, ppEnv)
+import EllipLang.SmartCons
+
 
 ------------------------------------------------------------------------
 -- Semantics
@@ -373,7 +375,7 @@ catVCons _ _                = error "Tried to catVCons non-lists"
 
 valEvalInt :: Val -> Int
 valEvalInt (Con t)  = t
-valEvalInt _        = error "Expected integer"
+valEvalInt t        = error $ "Expected integer but got: " ++ show t
 
 -- Match all alternatives vs Expr
 patternMatchEval :: Env -> Expr -> Alts -> Val
@@ -441,67 +443,5 @@ evalBinding e (LenFuture n) = Con $ getLen e boundList
 evalBinding e (ListFuture n) = evalBinding e (envLookup e n)
 evalBinding e (BIterator {it_ic=ic, content=c}) = case c of
     List (x:xs) -> x
-    List []     -> error "Empty list in bound iterator"
+    List []     -> error $ "Empty list in bound iterator" ++ show e
     Indices     -> Con ic
-
-
-------------------------------------------------------------------------
--- SMART CONSTRUCTORS
-------------------------------------------------------------------------
-
-[f,x,n,l,r,m,k,t,y,k',xs,ys] = map Var ["f","x","n","l","r","m","k","t","y","k'","xs","ys"]
-[x0,x1,x2] = map EllipVar [0,1,2]
-
-con :: Int -> Expr
-con i = Value $ Con i
-
-cons :: [Int] -> Expr
-cons l = foldr1 Cons (map con l ++ [Value Empty])
-
-ellipOne :: Expr -> Idx -> Idx -> Name -> Expr
-ellipOne t ib ie n = Ellipsis t [EllipRange {var=n, ident=0, ib=ib, ie=ie, contentT = BeList}]
-
--- y combinator
--- \f.( (\x.(f (x x))) (\x.(f (x x))) )
-ycomb :: Expr
-ycomb = Abstr "f" $
-            App (Abstr "x" $ App (Var "f" ) (App (Var "x") (Var "x")))
-                (Abstr "x" $ App (Var "f" ) (App (Var "x") (Var "x")))
-
-listToVCons :: [Val] -> Val
-listToVCons  = foldr VCons Empty
-
-listToCons :: [Expr] -> Expr
-listToCons = foldr Cons (Value Empty)
-
-unCons :: Expr -> [Expr]
-unCons = unfoldr unCons'
-    where
-    unCons' :: Expr -> Maybe (Expr, Expr)
-    unCons' (Value Empty)   = Nothing
-    unCons' (Cons t1 t2)    = Just (t1, t2)
-    unCons' t               = error $ "Unexpected unCons': " ++ show t
-
-unVCons :: Val -> [Val]
-unVCons = unfoldr unVCons'
-    where
-    unVCons' :: Val -> Maybe (Val, Val)
-    unVCons' Empty          = Nothing
-    unVCons' (VCons v1 v2)  = Just (v1, v2)
-    unVCons' v              = error $ "Unexpected unVCons': " ++ show v
-
-(!.) :: Expr -> Int -> Expr
-(Var n) !. i = ListElement n $ EPlace $ Value $ Con i
-
-(!) :: Expr -> Expr -> Expr
-(Var n) ! t = ListElement n (EPlace t)
-
-(<+>) :: Expr -> Expr -> Expr
-t1 <+> t2 = t1 `Pair` t2
-
-(<...>) :: Expr -> Expr -> Expr
-t1 <...> t2 = t1 `PreEllipsis` t2
-infix 1 <...>
-
-inte :: Int -> Expr
-inte i = Value $ Con i

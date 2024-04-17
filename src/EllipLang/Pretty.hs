@@ -4,6 +4,7 @@
 module EllipLang.Pretty where
 
 import EllipLang.Syntax
+
 import Data.Generics ( mkT, everywhere )
 import Data.List
 
@@ -12,6 +13,9 @@ pNewline i = "\n" ++ pTabs i
 
 pTabs :: Int -> String
 pTabs i = concat $ replicate i "\t"
+
+cOMMA :: Bool
+cOMMA = True
 
 pp :: Expr -> String
 pp = pp' 0
@@ -52,7 +56,7 @@ pp' tabs (Not t)              = "!(" ++ pp' tabs t ++ ")"
 pp' tabs (Error s)            = "error " ++ s
 pp' tabs ellip@(Ellipsis _ _) = ppEllip ellip
 pp' tabs (EllipVar i)         = "EllipVar(" ++ show i ++ ")"
-pp' tabs (PreEllipsis t1 t2)  = pp' tabs t1 ++ " ... " ++ pp' tabs t2
+pp' tabs (PreEllipsis t1 t2)  = "[" ++ pp' tabs t1 ++ " ... " ++ pp' tabs t2 ++ "]"
 pp' tabs (Index idx)          = ppIdx idx
 -- pp' tabs _            = "Error -- cannot display expression"
 
@@ -112,8 +116,11 @@ ppVal (VPair v1 v2) = "(" ++ ppVal v1 ++ ", " ++ ppVal v2 ++ ")"
 ppVal (Boolean b)   = if b then "true" else "false"
 ppVal _             = "Error"
 
+spacer :: String
+spacer = if cOMMA then "," else " "
+
 ppVCons :: Val -> String
-ppVCons (VCons v vs)    = ppVal v ++ if vs == Empty then "" else " " ++ ppVCons vs
+ppVCons (VCons v vs)    = ppVal v ++ if vs == Empty then "" else spacer ++ ppVCons vs
 ppVCons v               = error "Tried to ppVCons non-VCons: " ++ show v
 
 ppBindee :: Bindee -> String
