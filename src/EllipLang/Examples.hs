@@ -121,6 +121,15 @@ pairAdj = xs <.> case1 xs (
     (x, 1) <..> (x, n)  ==> (x!.1 `Pair` x!.2) <...> (x!(n `Sub` inte 1) `Pair` x!n)
     )
 
+-- For map
+succ' :: Expr
+succ' = x <.> x `Add` inte 1
+
+map' :: Expr
+map' = f <.> xs <.> case1 xs (
+    (x, 1) <..> (x, n)  ==> (f `App` (x!.1)) <...> (f `App` (x!n))
+    )
+
 {-
 subArrays' :: Expr
 subArrays' = Abstr "l" $ Abstr "k" $ Case l -- of

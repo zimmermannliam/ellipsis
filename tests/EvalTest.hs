@@ -148,5 +148,9 @@ testEval = map (\(l, t, expectedV) -> "eval" ~: l ~: eval Map.empty t ~?= expect
         pairAdj `App` exList6,
         let xs = exList6'
         in zip xs (tail xs) & vPairVCons)
+    
+    , ("map' succ' [8,14,32,0,4]",
+        map' `App` succ' `App` exList2,
+        vcons [9,15,33,1,5])
 
     ]
