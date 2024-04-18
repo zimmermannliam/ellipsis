@@ -1,10 +1,10 @@
-import Data.List (nub)
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a,b,c) = f a b c
 
 range :: ([a], Int, Int) -> [a]
-range (xs, i, j) | i <= j       = drop (i-1) $ take j $ xs
+range (xs, i, j) | i < 1        = []
+                 | i <= j       = drop (i-1) $ take j $ xs
                  | otherwise    = let
                     i' = length xs - i + 1
                     j' = length xs - j + 1
@@ -53,18 +53,27 @@ ellip2Skip f terms1 terms2 =
 rangeSkipArb :: (Int -> Int) -> ([a], Int, Int) -> [a]
 rangeSkipArb skipFn (xs, ifst, ilst) =
     let xs' = range (xs, ifst, ilst)
-        skipArb :: [Int] -> [(Int, a)] -> [a]
-        skipArb _ [] = []
-        skipArb (s:ss) ((i,x):ixs) | s == i     = x:(skipArb ss ixs)
-                                   | otherwise  = skipArb (s:ss) ixs
-    in skipArb (nub $ (ifst-1):(map skipFn [ifst..])) $ enumerate xs'
+        skipArb :: [Int] -> [a] -> [a]
+        skipArb [] _ = []
+        skipArb (i:is) xs = (xs!!i):(skipArb is xs)
+    in skipArb (takeWhile (\i -> i < ilst) $ dropWhile (\i -> i < ifst-1) $ map skipFn [0..]) xs'
 
-mylog = \i -> floor (logBase 2 (fromIntegral i :: Float)) :: Int
+mylog :: Int -> Int
+mylog i = floor (logBase 2 (fromIntegral i :: Float)) :: Int
 
 ellip2SkipArb :: (a0 -> a1 -> b) -> ([a0], Int, Int) -> ([a1], Int, Int) -> (Int -> Int) -> [b]
 ellip2SkipArb f terms1 terms2 skipFn =
     id
     $ zipWith f (rangeSkipArb skipFn terms1) (rangeSkipArb skipFn terms2)
 
-xs = [1..10]
-n = length xs
+xs = [1..5]
+nx = length xs
+
+ys = [2..8]
+ny = length ys
+
+zs = [1..100]
+nz = length zs
+
+ws = [8,14,32,0,4]
+nw = length ws
