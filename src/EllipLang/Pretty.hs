@@ -56,8 +56,10 @@ pp' tabs (Not t)              = "!(" ++ pp' tabs t ++ ")"
 pp' tabs (Error s)            = "error " ++ s
 pp' tabs ellip@(Ellipsis _ _) = ppEllip ellip
 pp' tabs (EllipVar i)         = "EllipVar(" ++ show i ++ ")"
-pp' tabs (PreEllipsis t1 t2)  = "[" ++ pp' tabs t1 ++ " ... " ++ pp' tabs t2 ++ "]"
+pp' tabs (PreEllipsis t1 t2)  = "(" ++ pp' tabs t1 ++ " ... " ++ pp' tabs t2 ++ ")"
 pp' tabs (Index idx)          = ppIdx idx
+pp' tabs (PreEllipsisFold t1 t2 f) 
+    = "(" ++ pp' tabs t1 ++ " `" ++ pp' tabs f ++ "` ... `" ++ pp' tabs f ++ "` " ++ pp' tabs t2 ++ ")"
 -- pp' tabs _            = "Error -- cannot display expression"
 
 ppEllip :: Expr -> String

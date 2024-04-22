@@ -153,4 +153,11 @@ testEval = map (\(l, t, expectedV) -> "eval" ~: l ~: eval Map.empty t ~?= expect
         map' `App` succ' `App` exList2,
         vcons [9,15,33,1,5])
 
+    , ("fold' add' [1,2,3,4,5]",
+        fold' `App` add' `App` exList,
+        Con (foldr1 (+) exList'))
+    , ("fold' add' [8,14,32,0,4]",
+        fold' `App` add' `App` exList2,
+        Con (foldr1 (+) exList2'))
+
     ]

@@ -6,21 +6,19 @@
 
 module EllipLang.Eval where
 
-import Debug.Trace
-import Data.Maybe
-import Data.Generics
-import Data.Data
-import Data.Either
-import Data.List
+import Debug.Trace ( trace, traceShow )
+import Data.Maybe ( fromMaybe )
+import Data.Generics ( mkT, everywhere )
+import Data.List ( find, (\\) )
 import qualified Data.Map as Map
 import qualified Data.Bifunctor
-import Control.Monad
 import Control.Monad.State
+    ( State, runState, MonadState(put, get) )
 import Data.Function ((&))
 
 import EllipLang.Syntax
 import EllipLang.Pretty (pp, ppVal, ppEnv)
-import EllipLang.SmartCons
+import EllipLang.SmartCons ( listToVCons, unVCons, ycomb )
 
 
 ------------------------------------------------------------------------
@@ -123,6 +121,18 @@ eval e (Mod t1 t2) = case (eval e t1, eval e t2) of
 eval e (Abs t) = case eval e t of
     (Con i)             -> Con (abs i)
     _                   -> errorOut' e "Bad abs term"
+
+eval e (Infix f t1 t2) = eval e (f `App` t1 `App` t2)
+eval e (PreEllipsisFold t1 tn f) = 
+    let list = unVCons (eval e (PreEllipsis t1 tn))
+    in eval e $ foldValToExpr (\a b -> f `App` a `App` b) list
+
+
+foldValToExpr :: (Expr -> Expr -> Expr) -> [Val] -> Expr
+foldValToExpr f []      = error "Tried to foldValToExpr an empty list"
+foldValToExpr f [x]     = Value x
+foldValToExpr f (x:xs)  = f (Value x) (foldValToExpr f xs)
+
 
 traceWith :: (a -> String) -> a -> a
 traceWith f t = t

@@ -31,7 +31,18 @@ exListV, exList2V, exList3V, exList4V, exList5V, exList6V :: Val
 
 -- PRELUDE FUNCTIONS
 prelude :: Env
-prelude = Map.empty
+prelude = Map.fromList [(NamedVar "findIdx", BVal $ eval Map.empty $ findIdx)]
+
+findIdx = 
+    g <.> list <.> LetRec "findIdx" (f <.> xs <.> k <.> Case xs -- of
+    [
+        (PVal Empty, k),
+        (PCons "x" "xs", if' (Not (f `App` x))
+            (Var "findIdx" `App` g `App` xs `App` (k `Add` inte 1))
+            else' k)
+    ])
+    --in
+    (Var "findIdx" `App` g `App` list `App` inte 0)
 
 firstK :: Expr
 firstK = xs <.> k <.> case1 xs (
@@ -112,7 +123,7 @@ inits' = Abstr "xs" $ Case xs -- of
 
 rotL :: Expr
 rotL = xs <.> k <.> case1 xs (
-    (x, 1) <..> (x, n)      ==> Let "k'" (k `Mod` n) $
+    (x, 1) <..> (x, n)  ==> Let "k'" (k `Mod` n) $
         (x!(k' `Add` inte 1) <...> x!n) `Cat` (x!.1 <...> x!k')
     )
 
@@ -128,6 +139,14 @@ succ' = x <.> x `Add` inte 1
 map' :: Expr
 map' = f <.> xs <.> case1 xs (
     (x, 1) <..> (x, n)  ==> (f `App` (x!.1)) <...> (f `App` (x!n))
+    )
+
+add' :: Expr
+add' = a <.> b <.> (a `Add` b)
+
+fold' :: Expr
+fold' = f <.> xs <.> case1 xs (
+    (x, 1) <..> (x, n)  ==> PreEllipsisFold (x!.1) (x!n) f
     )
 
 {-

@@ -13,7 +13,6 @@ data Expr = Var Name                -- Variable
           | Case Expr Alts          -- Case expression
           | LetRec Name Expr Expr   -- LetRec "Name" = Expr in Expr
           | Ellipsis Expr EllipRanges
-          | EllipsisFold Expr EllipRanges Expr
           | Cons Expr Expr          -- expr1:list
           | Cat Expr Expr           -- list1 ++ list2
           | Error String            -- Creates an error
@@ -39,6 +38,7 @@ data Expr = Var Name                -- Variable
           | PreEllipsis Expr Expr
           | PreEllipsisFold Expr Expr Expr -- (t1) + ... + (tn) would be PreEllipsisFold t1 t2 +
           | Index Idx
+          | Infix Expr Expr Expr
           deriving (Eq, Show, Data)
 infix 8 `Pair`
 infix 8 `Gt`
