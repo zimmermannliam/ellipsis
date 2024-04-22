@@ -1,9 +1,12 @@
+module Transformer where
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a,b,c) = f a b c
 
 range :: ([a], Int, Int) -> [a]
 range (xs, i, j) | i < 1        = []
+                 | j < 1        = []
+                 | i > length xs = []
                  | i <= j       = drop (i-1) $ take j $ xs
                  | otherwise    = let
                     i' = length xs - i + 1
