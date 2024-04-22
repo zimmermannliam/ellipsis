@@ -31,18 +31,23 @@ exListV, exList2V, exList3V, exList4V, exList5V, exList6V :: Val
 
 -- PRELUDE FUNCTIONS
 prelude :: Env
-prelude = Map.fromList [(NamedVar "findIdx", BVal $ eval Map.empty $ findIdx)]
+prelude = Map.fromList [(NamedVar "++", BVal $ eval Map.empty $ cat')]
 
-findIdx = 
-    g <.> list <.> LetRec "findIdx" (f <.> xs <.> k <.> Case xs -- of
-    [
-        (PVal Empty, k),
-        (PCons "x" "xs", if' (Not (f `App` x))
-            (Var "findIdx" `App` g `App` xs `App` (k `Add` inte 1))
-            else' k)
-    ])
-    --in
-    (Var "findIdx" `App` g `App` list `App` inte 0)
+cat' :: Expr
+cat' =
+    list1 <.> list2 <.> LetRec "cat" (l1 <.> l2 <.>
+        Case l1 -- of
+        [
+            (PVal Empty, l2),
+            (PCons "x" "xs", Cons x (Var "cat" `App` xs `App` l2))
+        ]
+    )
+    -- in
+    (Var "cat") `App` list1 `App` list2
+cat :: Expr
+cat = Var "++"
+
+-- Example functions
 
 firstK :: Expr
 firstK = xs <.> k <.> case1 xs (
@@ -149,7 +154,15 @@ fold' = f <.> xs <.> case1 xs (
     (x, 1) <..> (x, n)  ==> PreEllipsisFold (x!.1) (x!n) f
     )
 
+
+
+
 {-
+groupBy' :: Expr
+groupBy' = f <.> list <.> LetRec "groupBy" (
+    Let "k" (
+    )  -- in
+    (Var "groupBy") `App` f `App` list
 subArrays' :: Expr
 subArrays' = Abstr "l" $ Abstr "k" $ Case l -- of
     [
@@ -179,6 +192,7 @@ mergeSort' = Abstr "l" $ LetRec "mergeSort" -- =
 merge' :: Expr
 merge = Abstr "l1" $ Abstr "l2"
 -}
+
 foldRecursive :: Expr
 foldRecursive = Abstr "l" $ Abstr "f" $
         LetRec "fold" (Abstr "list" $ Abstr "fun" $ Case (Var "list")
