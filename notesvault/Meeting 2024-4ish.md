@@ -24,10 +24,10 @@
 	* List transformer
 * Composition of list transforms
 # Action Items
-* [ ] Compose functions as list transformers (hack your something-or-other):
-	* [ ] binSearch
-	* [ ] rotL
-	* [ ] pairAdj
+* [x] Compose functions as list transformers (hack your something-or-other): ✅ 2024-04-19
+	* [x] binSearch ✅ 2024-04-19
+	* [x] rotL ✅ 2024-04-19
+	* [x] pairAdj ✅ 2024-04-19
 * [x] Email Erwig regarding paper about list comprehension being syntactic sugar for composed transformers
 * [ ] Make it do fold
 * [ ] groupby?

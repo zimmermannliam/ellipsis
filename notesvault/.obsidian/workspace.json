@@ -13,7 +13,19 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "daily/2024-04-14.md",
+                "file": "daily/2024-04-22.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
+            "id": "6630e11fc0d456b4",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Meeting 2024-04-22.md",
                 "mode": "source",
                 "source": false
               }
@@ -25,14 +37,14 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "daily/2024-04-16.md",
+                "file": "Meeting 2024-04-22.md",
                 "mode": "source",
                 "source": false
               }
             }
           }
         ],
-        "currentTab": 1
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -82,7 +94,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 200
   },
   "right": {
     "id": "982fa576c7e27c2e",
@@ -98,7 +110,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "daily/2024-04-16.md",
+                "file": "Meeting 2024-04-22.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -115,7 +127,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "daily/2024-04-16.md",
+                "file": "Meeting 2024-04-22.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -138,7 +150,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "daily/2024-04-16.md"
+                "file": "Meeting 2024-04-22.md"
               }
             }
           }
@@ -161,17 +173,22 @@
   },
   "active": "d7b4c9bae315f96f",
   "lastOpenFiles": [
-    "Favorites.md",
+    "Meeting 2024-4ish.md",
+    "Meeting 2024-04-22.md",
+    "Combinations.canvas",
+    "daily/2024-04-19.md",
+    "daily/2024-04-22.md",
+    "Untitled",
+    "Todo.md",
+    "daily/2024-04-17.md",
     "daily/2024-04-16.md",
     "daily/2024-04-14.md",
-    "Combinations.canvas",
+    "Favorites.md",
     "daily/2024-04-11.md",
     "daily/2024-04-09.md",
     "Untitled.md",
-    "Todo.md",
     "daily/2024-04-05.md",
     "daily/2024-04-08.md",
-    "Meeting 2024-4ish.md",
     "daily/template.md",
     "Parser.md",
     "New Text Document.txt",

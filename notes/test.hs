@@ -1,5 +1,7 @@
 import Debug.Trace
-import Data.Function (&)
+import Data.Function ((&))
+import Data.Foldable (Foldable)
+import Data.Maybe (fromMaybe)
 
 map' :: [Int] -> (Int -> Int) -> [Int]
 map' [] _       = []
@@ -120,12 +122,45 @@ ellipsis1 xs f getBegin getEnd folder foldLast =
     in foldr folder foldLast xs''
 
 
+{-
 combinations' :: [a] -> [b] -> [(a, b)]
 combinations' xs ys = foldr (++) [] [(x, y) | x <- xs | y <- ys]
 
 
 combinations :: [a] -> [b] -> [(a, b)]
 combinations xs ys = 
+    -}
 
 -- combinations [x_1 ... x_n] [y_1 ... y_m] = 
 --    [(x_1, y_1) ... (x_1, y_m)] ... [(x_n, y_1) ... (x_n, y_m)]
+
+-- ellip :: (b -> b -> b) -> (a -> b) -> [([a], Int, Int)] -> b
+-- ellip g f terms = foldr1 (g) $ map f $ map range $ terms
+
+{-
+ellip1Fold :: (b -> b -> b) -> (a -> b) -> ([a], Int, Int) -> b
+ellip1Fold g f terms = foldr1 g $ map f $ range terms
+
+ellip1 :: (a -> b) -> ([a], Int, Int) -> [b]
+ellip1 f terms = id $ map f $ range terms
+
+ellip2Fold :: (b -> b -> b) -> ((a0, a1) -> b) -> (([a0], Int, Int), ([a1], Int, Int)) -> b
+ellip2Fold g f (terms1, terms2) = foldr1 g $ map f $ uncurry zip $ (range terms1, range terms2)
+
+ellip2 :: ((a0, a1) -> b) -> (([a0], Int, Int), ([a0], Int, Int)) -> [b]
+ellip1 f terms = id $ map f $ range terms
+
+range :: ([a], Int, Int) -> [a]
+range (xs, i, j) = drop (i-1) $ take j $ xs
+-}
+
+idxWhere :: (a -> a -> Bool) -> [a] -> Maybe Int
+idxWhere _ []       = Nothing
+idxWhere p xs   = foldr1 (+) $ 
+
+groupBy' :: (a -> a -> Bool) -> [a] -> [[a]]
+groupBy' f [] = []
+groupBy' f xs = 
+    let k = fromMaybe (length xs) (idxWhere (\l r -> not (f l r)))
+        (grp, rst) = splitAt k xs
+    in grp:(groupBy' f rst)
