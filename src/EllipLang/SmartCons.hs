@@ -5,7 +5,7 @@ import Data.Function ((&))
 
 import EllipLang.Syntax
 
-[f,x,n,l,r,m,k,t,y,k',xs,ys,list,term,g,a,b,list1,list2,l1,l2] = map Var ["f","x","n","l","r","m","k","t","y","k'","xs","ys","list","term","g","a","b","list1","list2","l1","l2"]
+[f,x,n,l,r,m,k,t,y,k',xs,ys,list,term,g,a,b,list1,list2,l1,l2,begin,end] = map Var ["f","x","n","l","r","m","k","t","y","k'","xs","ys","list","term","g","a","b","list1","list2","l1","l2","begin","end"]
 [x0,x1,x2] = map EllipVar [0,1,2]
 
 true = Value $ Boolean True
