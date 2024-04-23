@@ -22,8 +22,8 @@ pp = pp' 0
 
 pp' :: Int -> Expr -> String
 pp' tabs (Var n)      = n
-pp' tabs (App e1 e2)  = pp' tabs e1 ++ " " ++ pp' tabs e2
-pp' tabs (Abstr n e)  = "\\" ++ n ++ "." ++ pp' tabs e
+pp' tabs (App e1 e2)  = pp' tabs e1 ++ " (" ++ pp' tabs e2 ++ ")"
+pp' tabs (Abstr n e)  = "\\" ++ n ++ " -> (" ++ pp' tabs e ++ ")"
 pp' tabs (Value v)    = ppVal v
 pp' tabs (Let n e1 e2)        = "let " ++ n ++ " = " ++ pp' tabs e1  ++ " in " ++ pNewline (tabs+1) ++ pp' (tabs+1) e2
 pp' tabs (Case e alts)        = 
@@ -31,9 +31,9 @@ pp' tabs (Case e alts)        =
             PVal (Boolean _) -> True
             _ -> False) alts && length alts == 2
     then "if " ++ pp' tabs e ++ " then "  ++ pp' tabs (snd $ head $ filter (\x -> fst x == PVal (Boolean True)) alts) ++ pNewline tabs ++ "else " ++ pp' tabs (snd $ head $ filter (\x-> fst x == PVal (Boolean False)) alts)
-    else "case " ++ pp' tabs e ++ " of" ++ ppMatch alts (tabs + 1)
-pp' tabs (LetRec  n e1 e2)    = "letrec " ++ n ++ " = (" ++ pp' tabs e1 ++ pNewline tabs ++ ") in " ++ pp' tabs e2
-pp' tabs (Cons e1 e2)         = "(" ++ pp' tabs e1 ++ " : " ++ pp' tabs e2 ++ ")"
+    else "case " ++ pp' tabs e ++ " of {" ++ ppMatch alts (tabs + 1) ++ pNewline (tabs) ++  "}"
+pp' tabs (LetRec  n e1 e2)    = "let " ++ n ++ " = " ++ pp' tabs e1 ++ pNewline tabs ++ "in " ++ pp' tabs e2
+pp' tabs (Cons e1 e2)         = "(" ++ pp' tabs e1 ++ ") : (" ++ pp' tabs e2 ++ ")"
 pp' tabs (Pair t1 t2) = "(" ++ pp' tabs t1 ++ ", " ++ pp' tabs t2 ++ ")"
 pp' tabs (Cat t1 t2) = pp' tabs t1 ++ " ++ " ++ pp' tabs t2
 pp' tabs (ListElement n i) = n ++ "[" ++ ppIdx i ++ "]"
@@ -52,14 +52,16 @@ pp' tabs (Leq t1 t2)          = pp' tabs t1 ++ " <= " ++ pp' tabs t2
 pp' tabs (Geq t1 t2)          = pp' tabs t1 ++ " >= " ++ pp' tabs t2
 pp' tabs (Or t1 t2)           = pp' tabs t1 ++ " || " ++ pp' tabs t2
 pp' tabs (And t1 t2)          = pp' tabs t1 ++ " && " ++ pp' tabs t2
-pp' tabs (Not t)              = "!(" ++ pp' tabs t ++ ")"
-pp' tabs (Error s)            = "error " ++ s
+pp' tabs (Not t)              = "not (" ++ pp' tabs t ++ ")"
+pp' tabs (Error s)            = "error \"" ++ s ++ "\""
 pp' tabs ellip@(Ellipsis _ _) = ppEllip ellip
 pp' tabs (EllipVar i)         = "EllipVar(" ++ show i ++ ")"
 pp' tabs (PreEllipsis t1 t2)  = "(" ++ pp' tabs t1 ++ " ... " ++ pp' tabs t2 ++ ")"
 pp' tabs (Index idx)          = ppIdx idx
 pp' tabs (PreEllipsisFold t1 t2 f) 
     = "(" ++ pp' tabs t1 ++ " `" ++ pp' tabs f ++ "` ... `" ++ pp' tabs f ++ "` " ++ pp' tabs t2 ++ ")"
+pp' tabs t@ElliHaskellData {}
+    = show t
 -- pp' tabs _            = "Error -- cannot display expression"
 
 ppEllip :: Expr -> String
@@ -93,7 +95,7 @@ ellipVarToListElement _ _ t = t
 
 ppMatch :: Alts -> Int -> String
 ppMatch [] _                = ""
-ppMatch ((p, e):as) tabs    = pNewline tabs ++ ppPattern p ++ " -> " ++ pp' tabs e ++ ppMatch as tabs
+ppMatch ((p, e):as) tabs    = pNewline tabs ++ ppPattern p ++ " -> " ++ pp' tabs e ++ "; " ++ ppMatch as tabs 
 
 ppPattern :: Pattern -> String
 ppPattern (PCons n1 n2) = "(" ++ n1 ++ ":" ++ n2 ++ ")"
@@ -109,7 +111,7 @@ ppIdx (End n)     = n
 ppIdx (EPlace t) = pp' 0 t
 
 ppVal :: Val -> String
-ppVal (Con i)       = show i
+ppVal (Con i)       = if i >= 0 then show i else "(" ++ show i ++ ")"
 ppVal v@(VCons _ _)   = "[" ++ ppVCons v ++ "]"
 ppVal Empty       = "[]"
 ppVal (Closure n t e)   = "CLOSURE"-- "CLOSURE( " ++ ppEnv e ++ "|-" ++ pp (Abstr n t) ++ ")"
@@ -146,3 +148,13 @@ idxToExpr :: Idx -> Expr
 idxToExpr (EPlace t) = t
 idxToExpr (IPlace i) = Value $ Con i
 idxToExpr (End n)    = Var n
+
+
+miniHaskellPrelude = foldr1 (\l r -> l ++ "\n" ++ r)
+    ["import Prelude ((+), (-), div, (*), mod, (>), (>=), (<), (<=), (==), (&&), (||), not, error, (++), map, reverse, take, drop, length, Int, ($), otherwise)"
+    ,
+    "range :: [a] -> Int -> Int -> [a] \nrange xs i j     | i < 1        = [] \n                 | j < 1        = [] \n                 | i > length xs = [] \n                 | i <= j       = drop (i-1) $ take j $ xs \n                 | otherwise    = let \n                    i' = length xs - i + 1 \n                    j' = length xs - j + 1 \n                  in drop (i'-1) $ take j' $ reverse xs"
+    ]
+
+ppModule :: String -> [(String, Expr)] -> String
+ppModule s ms = "module " ++ s ++ " where\n\n" ++ miniHaskellPrelude ++ "\n\n" ++ (foldr (\l r -> r ++ "\n\n" ++ l) "" $ map (\(label, rhs) -> label ++ " = " ++ pNewline 1 ++ pp' 1 rhs) ms)
