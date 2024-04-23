@@ -30,8 +30,33 @@ exListV, exList2V, exList3V, exList4V, exList5V, exList6V :: Val
 [exListV, exList2V, exList3V, exList4V, exList5V, exList6V] = map vcons myLists
 
 -- PRELUDE FUNCTIONS
-prelude :: Env
-prelude = Map.fromList [(NamedVar "++", BVal $ eval Map.empty $ cat')]
+prelude' :: Env
+prelude' = Map.fromList 
+    [ (NamedVar "(++)", BVal $ eval Map.empty cat')
+    , (NamedVar "length", BVal $ eval Map.empty length')
+    , (NamedVar "map", BVal $ eval Map.empty mapRecursive)
+    , (NamedVar "zipWith", BVal $ eval Map.empty zipWith')
+    ]
+
+prelude = Map.union prelude' $ Map.fromList
+    [ (NamedVar "ranges", BVal $ eval prelude' ranges')
+    ]
+
+ranges' :: Expr
+ranges' = 
+    xs <.> begin <.> end <.> Case (begin `Lt` inte 1) --of
+    [
+        (PVal $ Boolean True, Value Empty),
+        (PVal $ Boolean False, Case (begin `Gt` (Var "length" `App` xs))
+        [
+            (PVal $ Boolean True, Value Empty),
+            (PVal $ Boolean False, Case (end `Lt` inte 1)
+            [
+                (PVal $ Boolean True, Value Empty),
+                (PVal $ Boolean False, (Var "drop" `App` (begin `Sub` inte 1)) `App` (Var "take" `App` end `App` xs))
+            ])
+        ])
+    ]
 
 cat' :: Expr
 cat' =
@@ -44,8 +69,45 @@ cat' =
     )
     -- in
     (Var "cat") `App` list1 `App` list2
-cat :: Expr
-cat = Var "++"
+
+length' :: Expr
+length' =
+    list1 <.> LetRec "length" (l1 <.>
+        Case l1 -- of
+        [
+            (PVal Empty, inte 0),
+            (PCons "x" "xs", inte 0 `Add` (Var "length" `App` xs))
+        ]
+    )
+    -- in
+    (Var "length") `App` list1
+
+mapRecursive :: Expr
+mapRecursive =
+    g <.> list1 <.> LetRec "map" (f <.> l1 <.>
+        Case l1 -- of
+        [
+            (PVal Empty, Value Empty),
+            (PCons "x" "xs", (f `App` xs) `Cons` (Var "map" `App` f `App` xs))
+        ]
+    ) -- in
+    (Var "map") `App` g `App` list1
+
+zipWith' :: Expr
+zipWith' =
+    g <.> list1 <.> list2 <.> LetRec "zipWith" (f <.> l1 <.> l2 <.>
+        Case l1 -- of
+        [
+            (PVal Empty, Value Empty),
+            (PCons "x" "xs", Case l2 -- of
+            [
+                (PVal Empty, Value Empty),
+                (PCons "y" "ys", (f `App` x `App` y) `Cons`
+                    (Var "zipWith" `App` f `App` xs `App` ys))
+            ])
+        ])
+        -- in
+        (Var "zipWith") `App` g `App` list1 `App` list2
 
 -- Example functions
 
@@ -227,14 +289,14 @@ nthRecursive = Abstr "l" $ Abstr "n" $
                     (PVal $ Con 0, Case (Var "list")
                     [
                         (PCons "x" "xs", Var "x"), 
-                        (PVal Empty, Value Empty),
-                        (PVar "_", Var "_")
+                        (PVal Empty, Error "Too far"),
+                        (PVar "_", Error "Bad")
                     ]),
                     (PVar "rem", Case (Var "list")
                     [
-                        (PCons "x" "xs", App (App (Var "nth") (Var "xs")) (Add (Var "rem") (Value $ Con (-1)))),
-                        (PVal Empty, Value Empty),
-                        (PVar "_", Var "_")
+                        (PCons "x" "xs", App (App (Var "nth") (Var "xs")) (Sub (Var "rem") (Value $ Con 1))),
+                        (PVal Empty, Error "Too far"),
+                        (PVar "_", Error "Bad")
                     ])
                 ]
             ) $ App (App (Var "nth")  (Var "l")) (Var "n")
@@ -281,3 +343,12 @@ removeNthRecursive = Abstr "l" $ Abstr "i" $
             ])
             -- in
             (App (App (Var "removeNth") (Var "l")) (Var "i"))
+
+recursiveModule = [
+    ("fold", foldRecursive),
+    ("reverse", reverseRecursive),
+    ("nth", nthRecursive),
+    ("sum", sumRecursive),
+    ("len", lenRecursive),
+    ("removeNth", removeNthRecursive)
+    ]
