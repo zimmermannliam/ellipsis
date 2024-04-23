@@ -2,7 +2,7 @@
 
 module EllipLang.Syntax where
 
-import Data.Generics ( Data )
+import Data.Generics (Data, Typeable)
 import qualified Data.Map as Map
 
 data Expr = Var Name                -- Variable
@@ -39,7 +39,11 @@ data Expr = Var Name                -- Variable
           | PreEllipsisFold Expr Expr Expr -- (t1) + ... + (tn) would be PreEllipsisFold t1 t2 +
           | Index Idx
           | Infix Expr Expr Expr
-          deriving (Eq, Show, Data)
+          | ElliHaskellData { ehs_ib :: Idx
+                            , ehs_ie :: Idx
+                            , ehs_name :: Name
+                            , ehs_id :: Maybe Int }
+          deriving (Eq, Show, Data, Typeable)
 infix 8 `Pair`
 infix 8 `Gt`
 infix 8 `Lt`
@@ -54,19 +58,19 @@ data Val    = Con Int
               | VPair Val Val
               | VStr String
               | Boolean Bool
-             deriving (Eq, Show, Data)
+             deriving (Eq, Show, Data, Typeable)
 
 data Pattern = PCons Name Name
              | PCons' Expr Expr
              | PVar Name
              | PVal Val
              | PEllipsis Name Idx -- x1 ... xn -> x2 ... xn
-             deriving (Eq, Show, Data)
+             deriving (Eq, Show, Data, Typeable)
 
 data Idx    = IPlace Int        -- Reflect work they're doing -- 
             | End Name 
             | EPlace Expr -- Must evaluate to an integer
-            deriving (Eq, Show, Data)
+            deriving (Eq, Show, Data, Typeable)
 
 -- Bindee?
 data Bindee    = BVal Val
@@ -77,29 +81,29 @@ data Bindee    = BVal Val
                              it_ic :: Int,
                              vname :: Name,
                              content :: IteratorContent}
-                deriving (Eq, Show, Data)
+                deriving (Eq, Show, Data, Typeable)
 
 data ContentType = BeList | BeIndices
-    deriving (Eq, Show, Data)
+    deriving (Eq, Show, Data, Typeable)
 
 data IteratorContent = List [Val] | Indices
-    deriving (Eq, Show, Data)
+    deriving (Eq, Show, Data, Typeable)
 
 data EllipRange = EllipRange { ident :: Id
                              , var :: Name
                              , ib :: Idx
                              , ie :: Idx
                              , contentT :: ContentType}
-                             deriving (Eq, Show, Data)
+                             deriving (Eq, Show, Data, Typeable)
 
 data EllipSide = Begin | EndSide
-    deriving (Eq, Show, Data)
+    deriving (Eq, Show, Data, Typeable)
 
 data Identifier         = NamedVar Name | IdVar Id
-    deriving (Eq, Show, Data, Ord)
+    deriving (Eq, Show, Data, Typeable, Ord)
 
 newtype EllipError        = EllipError String
-    deriving (Eq, Show, Data)
+    deriving (Eq, Show, Data, Typeable)
 
 type EllipRanges        = [EllipRange]
 type Name               = String

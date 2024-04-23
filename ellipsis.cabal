@@ -65,6 +65,7 @@ library EllipLang
     import: shared
     exposed-modules:
         EllipLang.Examples
+        EllipLang.Translator
         EllipLang.Parser
         EllipLang.Pretty
         EllipLang.Eval
@@ -75,17 +76,27 @@ executable ellipc
     import:           shared
     main-is:          Main.hs
     other-modules:
-        EllipLang.Syntax
-        EllipLang.Eval
-        EllipLang.Examples
-        EllipLang.Pretty
+        EllipLang.Translator
         EllipLang.Parser
+        EllipLang.Pretty
+        EllipLang.Syntax
+        EllipLang.Examples
         EllipLang.SmartCons
+        EllipLang.Eval
 
-test-suite tests
+test-suite evalTest
     hs-source-dirs: tests
     type:           exitcode-stdio-1.0
     main-is:        EvalTest.hs
+    build-depends:  base ^>=4.17.2.1,
+                    EllipLang,
+                    HUnit,
+                    containers
+
+test-suite translateTest
+    hs-source-dirs: tests
+    type:           exitcode-stdio-1.0
+    main-is:        TranslateTest.hs
     build-depends:  base ^>=4.17.2.1,
                     EllipLang,
                     HUnit,
