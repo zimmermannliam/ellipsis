@@ -2,6 +2,7 @@ import Debug.Trace
 import Data.Function ((&))
 import Data.Foldable (Foldable)
 import Data.Maybe (fromMaybe)
+import Data.Generics
 
 map' :: [Int] -> (Int -> Int) -> [Int]
 map' [] _       = []
@@ -152,11 +153,6 @@ ellip1 f terms = id $ map f $ range terms
 
 range :: ([a], Int, Int) -> [a]
 range (xs, i, j) = drop (i-1) $ take j $ xs
--}
-
-idxWhere :: (a -> a -> Bool) -> [a] -> Maybe Int
-idxWhere _ []       = Nothing
-idxWhere p xs   = foldr1 (+) $ 
 
 groupBy' :: (a -> a -> Bool) -> [a] -> [[a]]
 groupBy' f [] = []
@@ -164,3 +160,62 @@ groupBy' f xs =
     let k = fromMaybe (length xs) (idxWhere (\l r -> not (f l r)))
         (grp, rst) = splitAt k xs
     in grp:(groupBy' f rst)
+
+idxWhere :: (a -> a -> Bool) -> [a] -> Maybe Int
+idxWhere _ []       = Nothing
+idxWhere p xs   = foldr1 (+) $ 
+-}
+
+
+myMap = 
+    let myMap = \f -> (\list -> (case list of {
+        [] -> [];
+        (x:xs) -> (f x):(myMap f xs)
+    }))
+    in myMap
+
+{-
+addNodes :: Tree -> Tree -> Tree
+addNodes (INode il) (INode ir) = INode (il + ir)
+addNodes l r = l
+
+incZ :: (Int, Tree) -> (Int, Tree)
+incZ (i, t) = (i+1, t)
+
+
+incINode :: Tree -> Tree
+incINode (INode i)  = INode (i+1)
+incINode (Blah t)   = traceShow t $ SNode "Blah" `Branch` INode 0
+incINode tr         = tr
+
+incAll :: Tree -> Tree
+incAll = everywhere (mkT incINode)
+
+sumINodes :: Tree -> Int
+sumINodes = everything (+) (mkQ 0 (fromMaybe 0 . iNodeI))
+
+
+iNodeI :: Tree -> Maybe Int
+iNodeI (INode i)    = Just i
+iNodeI _            = Nothing
+
+-}
+
+data Tree = Branch Tree Tree | Leaf Int
+    deriving (Data, Show)
+
+tr1 = (Leaf 5) `Branch` ((Leaf 6) `Branch` (Leaf 7))
+tr2 = (Leaf 10) `Branch` ((Leaf 11) `Branch` (Leaf 12))
+
+gcollect :: Tree -> [Int]
+gcollect = everything (++) ([] `mkQ` fromLeaf)
+
+fromLeaf :: Tree -> [Int]
+fromLeaf (Leaf x)   = [x]
+fromLeaf _          = []
+
+gCollectSum :: Tree -> Tree -> [Int]
+gCollectSum x y = gCollectSum' x y
+    where
+    gCollectSum :: GenericQ (GenericQ Int)
+    gCollectSum x y = 

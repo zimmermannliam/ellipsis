@@ -1,36 +1,37 @@
-import Data.Generics.Schemes
 import Data.Generics
-import Data.Data
 
-{-# LANGUAGE DeriveDataTypeable #-}
+data Tree = Branch Tree Tree | Leaf Int
+    deriving (Data, Show, Typeable)
 
-data MyTree = Leaf Int
-            | LeafSpecial Int
-            | NodeA MyTree
-            | NodeB MyTree MyTree
-            | NodeC MyTree MyTree Int
-            deriving (Data, Show)
-
-mytree  = NodeB (Leaf 1) (LeafSpecial 2)
-mytree2 = NodeC (NodeB (Leaf 1) (LeafSpecial 2)) (NodeA (LeafSpecial 3)) 4
-
-pp :: MyTree -> String
-pp (Leaf i)         = "L" ++ show i
-pp (LeafSpecial i)  = "S" ++ show i
-pp (NodeA t)        = "(" ++ pp t ++ ")"
-pp (NodeB t1 t2)    = "[(" ++ pp t1 ++ ")(" ++ pp t2 ++ ")]"
-pp (NodeC t1 t2 i)  = show i ++ "{(" ++ pp t1 ++ ")(" ++ pp t2 ++ ")}" 
-
-replaceSpecialRecursive :: MyTree -> MyTree
-replaceSpecialRecursive (Leaf i)         = Leaf i
-replaceSpecialRecursive (LeafSpecial i)  = Leaf i
-replaceSpecialRecursive (NodeA t)        = NodeA $ replaceSpecialRecursive t
-replaceSpecialRecursive (NodeB t1 t2)    = NodeB (replaceSpecialRecursive t1) (replaceSpecialRecursive t2)
-replaceSpecialRecursive (NodeC t1 t2 i)  = NodeC (replaceSpecialRecursive t1) (replaceSpecialRecursive t2) i
+tr1 = (Leaf 5) `Branch` ((Leaf 6) `Branch` (Leaf 7))
+tr2 = (Leaf 10) `Branch` ((Leaf 11) `Branch` (Leaf 12))
+tr3 = (Leaf 110) `Branch` (Leaf 120)
 
 
-replaceSpecial :: MyTree -> MyTree
-replaceSpecial t = everywhere (mkT replaceSpecial') t
-    where   replaceSpecial' :: MyTree -> MyTree
-            replaceSpecial' (LeafSpecial i) = Leaf i
-            replaceSpecial' t               = t
+sumTrees t1 t2 = gzip (\x y -> mkTTMaybe addLeaf x y) t1 t2
+
+getTreePairs t1 t2 = everythingB   
+
+pairLeaf :: Tree -> Tree -> [(Int, Int)]
+pairLeaf (Leaf l) (Leaf r) = [(l, r)]
+pairLeaf _ _ = []
+
+
+addLeaf :: Tree -> Tree -> Maybe Tree
+addLeaf (Leaf l) (Leaf r) = Just (Leaf (l+r))
+addLeaf _ _ = Nothing
+
+
+mkTT :: (Typeable a, Typeable b, Typeable c)
+    => (a -> a -> a) -> b -> c -> Maybe c
+mkTT f x y = case (cast x, cast y) of
+    (Just (x'::a), Just (y'::a))    -> cast (f x' y')
+    _                               -> Nothing
+
+mkTTMaybe :: (Typeable a, Typeable b, Typeable c)
+    => (a -> a -> Maybe a) -> b -> c -> Maybe c
+mkTTMaybe f x y = case (cast x, cast y) of
+    (Just (x'::a), Just (y'::a))    -> case (f x' y') of
+        Just res -> cast res
+        Nothing -> Nothing
+    _                               -> Nothing
