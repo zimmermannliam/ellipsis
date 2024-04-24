@@ -49,7 +49,7 @@ eval e (ListElement n i) = findListFutureElement e (envLookup e n) i
 eval e (EllipVar i)   = evalBinding e (e Map.! IdVar i)
 eval e ell@(PreEllipsis _ _) = eval e $ processPreEllipsis e ell
 eval e (Index idx)    = eval e $ idxToExpr idx
-eval e (Ellipsis t rs) = let
+eval e (ElliComp t rs) = let
     ellipEnv = getEllipsisIterators e rs
     in
     if not (rangesCheck ellipEnv)
@@ -139,7 +139,7 @@ traceWith f t = t
 -- traceWith f t = trace (f t) t
 
 processPreEllipsis :: Env -> Expr -> Expr
-processPreEllipsis e (PreEllipsis t1 t2) = traceWith (pp) $ Ellipsis t rs
+processPreEllipsis e (PreEllipsis t1 t2) = traceWith (pp) $ ElliComp t rs
     where
     (pre_rs, pre_t) = extractStates e
     (t,(rs',_)) = runState (processPreEllipsis' t1 t2) (pre_rs, pre_t)
@@ -208,10 +208,10 @@ processPreEllipsis' (Let vb tib tob) (Let ve tie toe) = if vb == ve
     else error $ "PreEllipsis: Unequal let vars: "++vb++" ... "++ve
 processPreEllipsis' (Case _ _) (Case _ _) = error "PreEllipsis: Case not implemented"
 processPreEllipsis' (LetRec {}) (LetRec {}) = error "PreEllipsis: LetRec not implemented"
-processPreEllipsis' (Ellipsis tb rsb) (Ellipsis te rse) =
+processPreEllipsis' (ElliComp tb rsb) (ElliComp te rse) =
     trace "Warning: PreEllipsis: Nested ellipsis are currently awkward" $
     if rsb == rse
-        then doOne (`Ellipsis` rsb) tb te
+        then doOne (`ElliComp` rsb) tb te
         else error "PreEllipsis: Not equal ranges (This could be changed in the future)"
 processPreEllipsis' (Cons t1b t2b) (Cons t1e t2e)   = doTwo Cons (t1b, t2b) (t1e,t2e)
 processPreEllipsis' (Cat t1b t2b) (Cat t1e t2e)     = doTwo Cat (t1b, t2b) (t1e,t2e)

@@ -21,7 +21,7 @@ vcons :: [Int] -> Val
 vcons = foldr (VCons . Con) Empty
 
 ellipOne :: Expr -> Idx -> Idx -> Name -> Expr
-ellipOne t ib ie n = Ellipsis t [EllipRange {var=n, ident=0, ib=ib, ie=ie, contentT = BeList}]
+ellipOne t ib ie n = ElliComp t [EllipRange {var=n, ident=0, ib=ib, ie=ie, contentT = BeList}]
 
 -- y combinator
 -- \f.( (\x.(f (x x))) (\x.(f (x x))) )

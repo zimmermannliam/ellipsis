@@ -107,7 +107,7 @@ isCore = everything (&&) (True `mkQ` isCore')
     isCore' :: Expr -> Bool
     isCore' (PreEllipsis _ _)       = False
     isCore' (PreEllipsisFold {} )   = False
-    isCore' (Ellipsis _ _)          = False
+    isCore' (ElliComp _ _)          = False
     isCore' (EllipVar _)            = False
     isCore' (ElliHaskellData {})    = False
     isCore' _                       = True

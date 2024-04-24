@@ -12,7 +12,7 @@ data Expr = Var Name                -- Variable
           | Let Name Expr Expr      -- Let expression
           | Case Expr Alts          -- Case expression
           | LetRec Name Expr Expr   -- LetRec "Name" = Expr in Expr
-          | Ellipsis Expr EllipRanges
+          | ElliComp Expr EllipRanges
           | Cons Expr Expr          -- expr1:list
           | Cat Expr Expr           -- list1 ++ list2
           | Error String            -- Creates an error

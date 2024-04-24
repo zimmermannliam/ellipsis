@@ -54,7 +54,7 @@ pp' tabs (Or t1 t2)           = pp' tabs t1 ++ " || " ++ pp' tabs t2
 pp' tabs (And t1 t2)          = pp' tabs t1 ++ " && " ++ pp' tabs t2
 pp' tabs (Not t)              = "not (" ++ pp' tabs t ++ ")"
 pp' tabs (Error s)            = "error \"" ++ s ++ "\""
-pp' tabs ellip@(Ellipsis _ _) = ppEllip ellip
+pp' tabs ellip@(ElliComp _ _) = ppEllip ellip
 pp' tabs (EllipVar i)         = "EllipVar(" ++ show i ++ ")"
 pp' tabs (PreEllipsis t1 t2)  = "(" ++ pp' tabs t1 ++ " ... " ++ pp' tabs t2 ++ ")"
 pp' tabs (Index idx)          = ppIdx idx
@@ -65,7 +65,7 @@ pp' tabs t@ElliHaskellData {}
 -- pp' tabs _            = "Error -- cannot display expression"
 
 ppEllip :: Expr -> String
-ppEllip (Ellipsis t rs) = let
+ppEllip (ElliComp t rs) = let
     tb = pp $ ellipExprReplace rs Begin t
     te = pp $ ellipExprReplace rs EndSide t
     in
@@ -82,7 +82,7 @@ ellipVarToListElement rs side t@(EllipVar id) = let r = rangeLookup' rs id
             then ListElement (var r') (if side == Begin then ib r' else ie r')
             else (if side == Begin then idxToExpr $ ib r' else idxToExpr $ ie r')
         Nothing     -> t
-ellipVarToListElement rs side (Ellipsis t innerRs) = Ellipsis t mappedInnerRs
+ellipVarToListElement rs side (ElliComp t innerRs) = ElliComp t mappedInnerRs
     where 
     mappedInnerRs   = map (\x -> x { ib=case ib x of
         EPlace t' -> EPlace $ ellipExprReplace rs side t'
