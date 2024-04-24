@@ -1,15 +1,17 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module EllipLang.Translator where
 
-import Data.Generics (everywhere, mkT, everything, mkQ, cast, Typeable, gzip)
-import Data.Function ((&))
+import Data.Generics 
 import EllipLang.Syntax
-import EllipLang.Examples
-import Data.Maybe (fromMaybe)
+import EllipLang.Pretty (pp)
+import GenericHelper (everywhereUntil, mkTTMaybe)
 import EllipLang.Eval (idxToExpr)
+import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 
 data ElliClass = Fold Expr ElliClass
                | ZipWith Int
+
+type ListAliases = Map.Map Name Expr
 
 ------------------------------------------------------------------------
 -- 
@@ -18,62 +20,79 @@ data ElliClass = Fold Expr ElliClass
 ------------------------------------------------------------------------
 
 translate :: Expr -> Expr
-translate tr = tr
-    & everywhere (mkT unEllipsisAlt)
-    & everywhere (mkT unEllipsisExpr)
+translate = translate' Map.empty
 
-unEllipsisExpr :: Expr -> Expr
-unEllipsisExpr (PreEllipsis tl tr) =
-    let t = transformPreEllipsis tl tr
-        c = classifyPreEllipsis t
-    in toCore c t
-unEllipsisExpr t = t
+translate' :: ListAliases -> Expr -> Expr
+translate' aliases = everywhereUntil (False `mkQ` isElliCase) (mkT (unElliCase aliases))
 
-toCore :: ElliClass -> Expr -> Expr
-toCore (ZipWith 1) t = 
-    let f   = ellipTermToAnonFun 1 t
-        ehd = head $ collectElliData t
-        ib = idxToExpr $ ehs_ib ehd
-        ie = idxToExpr $ ehs_ie ehd
-    in (Var "map") `App` f `App` (Var "range" `App` (Var "xs") `App` ib `App` ie)
-
-ellipTermToAnonFun :: Int -> Expr -> Expr
-ellipTermToAnonFun 1 t = 
-    let name = (ehs_name $ head $ collectElliData t) ++ "_elliHaskell_1"
-    in Abstr name (everywhere (mkT (replaceElliData name)) t)
-    where 
-    replaceElliData s (ElliHaskellData {}) = (Var s)
-    replaceElliData _ t = t
-ellipTermToAnonFun i t = error $ "Weird: i=" ++ show i ++ "; t=" ++ show t
-
-transformPreEllipsis :: Expr -> Expr -> Expr
-transformPreEllipsis l r = fromMaybe (error "transformPreEllipsis") (gzip (\x y -> mkTTMaybe toElliData x y) l r)
+isElliCase :: Expr -> Bool
+isElliCase (Case _ alts) = (isElliPattern . fst) `any` alts
     where
-    toElliData :: Expr -> Expr -> Maybe Expr
-    toElliData (ListElement nl il) (ListElement nr ir) = 
-        if nl /= nr then error "toElliData" else
-        Just ElliHaskellData {
-            ehs_ib = il,
-            ehs_ie = ir,
-            ehs_name = nl,
-            ehs_id = Nothing
-        }
-    toElliData _ _ = Nothing -- Unchanged
+    isElliPattern :: Pattern -> Bool
+    isElliPattern (PEllipsis _ _) = True
+    isElliPattern _ = False
+isElliCase _ = False
 
-classifyPreEllipsis :: Expr -> ElliClass
-classifyPreEllipsis transformedTree =
-    let collection = collectElliData transformedTree
-    in ZipWith (length collection)
+{-
+    ... case ...
+        / unElliCase
+    case <target> of <alts>
+                        / unElliAlts
+            { x1 ... xn -> <t>; ...}
+                           / unElliExpr
+                    ... (x1 ... xn) ...
+                         / unPreElli
+                        
+-}
 
+unElliCase :: ListAliases -> Expr -> Expr
+-- Can be used generically; takes a case with elli-haskell patterns
+-- and transforms them into mini-haskell expressions
+unElliCase aliases c@(Case target alts) = 
+    let alts' = map (unElliAlt aliases target) alts
+    in Case target alts
+unElliCase aliases t = t
 
-collectElliData = everything (++) ([] `mkQ` getElliData)
-    where 
-    getElliData :: Expr -> [Expr]
-    getElliData ehd@(ElliHaskellData {}) = [ehd]
-    getElliData _                        = []
+addAliases :: Name -> Expr -> Idx -> ListAliases -> ListAliases
+addAliases listAlias target idx aliases =
+    let aliasMap = Map.fromList [(listAlias, target)]
+        idxAlias = Map.fromList (
+            case idxToName idx of {
+                Just lenName -> [(lenName, App (Var "length") target)];
+                Nothing -> [];
+            })
+    in aliases `Map.union` aliasMap `Map.union` idxAlias
+    where
+    idxToName :: Idx -> Maybe Name
+    idxToName i = case idxToExpr i of
+        Var n   -> Just n
+        _       -> Nothing
 
-unEllipsisAlt :: (Pattern,Expr) -> (Pattern,Expr)
-unEllipsisAlt (PEllipsis n (End ni), t) = (PVar ("_"), Let ni (Var "length" `App` Var "xs") t)
+unElliAlt :: ListAliases -> Expr -> (Pattern, Expr) -> (Pattern, Expr)
+-- Takes an elli-haskell alt and turns it into a non-elli-haskell alt.
+unElliAlt aliases target (PEllipsis listAlias len, t) = 
+    let aliases' = addAliases listAlias target len aliases
+        t' = unElliExpr aliases' t
+    in (PVar "_", t')
+unElliAlt _ _ alt = alt
+
+unElliExpr :: ListAliases -> Expr -> Expr
+unElliExpr aliases = everywhereUntil (False `mkQ` isPreElli) (mkT (unElliExpr' aliases)) -- make until pre ellip
+
+isPreElli :: Expr -> Bool
+isPreElli (PreEllipsis _ _) = True
+isPreElli _                 = False
+
+unElliExpr' :: ListAliases -> Expr -> Expr
+unElliExpr' aliases (PreEllipsis tl tr) =
+    let t = fromMaybe (error "Different structure in ellipsis") $ gzip (\l r -> mkTTMaybe (unPreElli aliases) l r) tl tr
+    in t
+unElliExpr' _ t = t
+
+unPreElli :: ListAliases -> Expr -> Expr -> Maybe Expr
+unPreElli aliases (ListElement nl il) (ListElement nr ir) 
+    | nl /= nr = error "Different list element terms"
+    | otherwise = error "Blah"
 
 ------------------------------------------------------------------------
 -- 
@@ -92,12 +111,3 @@ isCore = everything (&&) (True `mkQ` isCore')
     isCore' (EllipVar _)            = False
     isCore' (ElliHaskellData {})    = False
     isCore' _                       = True
-
--- Helper function: Generic 
-mkTTMaybe :: (Typeable a, Typeable b, Typeable c)
-    => (a -> a -> Maybe a) -> b -> c -> Maybe c
-mkTTMaybe f x y = case (cast x, cast y) of
-    (Just (x'::a), Just (y'::a))    -> case (f x' y') of
-        Just res -> cast res
-        Nothing -> Nothing
-    _                               -> Nothing

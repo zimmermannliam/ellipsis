@@ -60,6 +60,7 @@ common shared
                         parsec,
                         MissingH
     other-extensions: 
+    other-modules:      GenericHelper
 
 library EllipLang
     import: shared
@@ -71,6 +72,7 @@ library EllipLang
         EllipLang.Eval
         EllipLang.Syntax
         EllipLang.SmartCons
+    hidden-modules:
     
 executable ellipc
     import:           shared
