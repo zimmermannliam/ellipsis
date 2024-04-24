@@ -10,7 +10,6 @@ tr3 = (Leaf 110) `Branch` (Leaf 120)
 
 sumTrees t1 t2 = gzip (\x y -> mkTTMaybe addLeaf x y) t1 t2
 
-getTreePairs t1 t2 = everythingB   
 
 pairLeaf :: Tree -> Tree -> [(Int, Int)]
 pairLeaf (Leaf l) (Leaf r) = [(l, r)]
