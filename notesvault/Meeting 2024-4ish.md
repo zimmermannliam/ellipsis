@@ -29,7 +29,7 @@
 	* [x] rotL ✅ 2024-04-19
 	* [x] pairAdj ✅ 2024-04-19
 * [x] Email Erwig regarding paper about list comprehension being syntactic sugar for composed transformers
-* [ ] Make it do fold
+* [x] Make it do fold ✅ 2024-04-22
 * [ ] groupby?
 
 ```haskell

@@ -37,14 +37,14 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Meeting 2024-04-22.md",
+                "file": "Todo.md",
                 "mode": "source",
                 "source": false
               }
             }
           }
         ],
-        "currentTab": 2
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -171,15 +171,15 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "d7b4c9bae315f96f",
+  "active": "6630e11fc0d456b4",
   "lastOpenFiles": [
+    "Todo.md",
     "Meeting 2024-4ish.md",
+    "daily/2024-04-22.md",
     "Meeting 2024-04-22.md",
     "Combinations.canvas",
     "daily/2024-04-19.md",
-    "daily/2024-04-22.md",
     "Untitled",
-    "Todo.md",
     "daily/2024-04-17.md",
     "daily/2024-04-16.md",
     "daily/2024-04-14.md",
