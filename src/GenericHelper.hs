@@ -10,6 +10,7 @@
 module GenericHelper where
 
 import Data.Generics
+import Control.Monad.State
 
 everywhereUntil :: GenericQ Bool -> GenericT -> GenericT
 -- Variation on everywhere that executes f on the last thing to 
@@ -22,10 +23,14 @@ everywhereUntil q f = go
         | otherwise = f (gmapT go x)
 
 
--- Inspired by dreixel/syb/tests/GZip.hs
+
 mkTTMaybe :: (Typeable a, Typeable b, Typeable c) => 
     (a -> a -> Maybe a) -> b -> c -> Maybe c
 -- Takes a function that, on nothing, will be traversed into.
 mkTTMaybe f x y = case (cast x, cast y) of
     (Just (x'::a), Just (y'::a))    -> maybe Nothing cast (f x' y')
     _                               -> Nothing
+
+
+runStateEverywhere :: (Data a, Data b) => (b -> State s b) -> s -> a -> (a, s)
+runStateEverywhere f initState t = runState (everywhereM (mkM f) t) initState
