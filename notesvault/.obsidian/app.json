@@ -1,5 +1,7 @@
 {
   "vimMode": true,
   "autoPairBrackets": false,
-  "autoPairMarkdown": false
+  "autoPairMarkdown": false,
+  "livePreview": false,
+  "useTab": false
 }
