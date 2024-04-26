@@ -72,7 +72,7 @@ t1 <+> t2 = t1 `Pair` t2
 infix 8 <+>
 
 (<...>) :: Expr -> Expr -> Expr
-t1 <...> t2 = t1 `PreEllipsis` t2
+t1 <...> t2 = t1 `Ellipsis` t2
 infix 3 <...>
 
 inte :: Int -> Expr

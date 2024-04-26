@@ -31,7 +31,7 @@ testSmartCons = map ("smart cons" ~:)
         ) ~?= Abstr "x" (Case x 
             [(PEllipsis "x" (End "n"), 
                 Add (ListElement "x" (EPlace $ Value $ Con 1)) (Value $ Con 1)
-                `PreEllipsis`
+                `Ellipsis`
                 Add (ListElement "x" (EPlace $ Var "n")) (Value $ Con 1)
             )])
     ]

@@ -47,7 +47,7 @@ eval e (LetRec n t1 t2) = case eval e t1 of
 -- Ellipsis/list operators
 eval e (ListElement n i) = findListFutureElement e (envLookup e n) i
 eval e (EllipVar i)   = evalBinding e (e Map.! IdVar i)
-eval e ell@(PreEllipsis _ _) = eval e $ processPreEllipsis e ell
+eval e ell@(Ellipsis _ _) = eval e $ elliToComp e ell
 eval e (Index idx)    = eval e $ idxToExpr idx
 eval e (ElliComp t rs) = let
     ellipEnv = getEllipsisIterators e rs
@@ -123,8 +123,8 @@ eval e (Abs t) = case eval e t of
     _                   -> errorOut' e "Bad abs term"
 
 eval e (Infix f t1 t2) = eval e (f `App` t1 `App` t2)
-eval e (PreEllipsisFold t1 tn f) = 
-    let list = unVCons (eval e (PreEllipsis t1 tn))
+eval e (ElliFold t1 tn f) = 
+    let list = unVCons (eval e (Ellipsis t1 tn))
     in eval e $ foldValToExpr (\a b -> f `App` a `App` b) list
 
 
@@ -138,13 +138,13 @@ traceWith :: (a -> String) -> a -> a
 traceWith f t = t
 -- traceWith f t = trace (f t) t
 
-processPreEllipsis :: Env -> Expr -> Expr
-processPreEllipsis e (PreEllipsis t1 t2) = traceWith (pp) $ ElliComp t rs
+elliToComp :: Env -> Expr -> Expr
+elliToComp e (Ellipsis t1 t2) = traceWith (pp) $ ElliComp t rs
     where
     (pre_rs, pre_t) = extractStates e
-    (t,(rs',_)) = runState (processPreEllipsis' t1 t2) (pre_rs, pre_t)
+    (t,(rs',_)) = runState (elliToComp' t1 t2) (pre_rs, pre_t)
     rs = rs' \\ pre_rs
-processPreEllipsis _ _ = error "Trying to processPreEllipsis on non-preEllipsis"
+elliToComp _ _ = error "Trying to convert ellipsis to comprehension without ellipsis"
 
 extractStates :: Env -> (EllipRanges, Int)
 extractStates e = let 
@@ -178,9 +178,9 @@ mergeEllipVars ib' ie' = return (EllipVar ib')
             varl==varr && ibl==ibr && iel==ier
             -}
 
-processPreEllipsis' :: Expr -> Expr -> State (EllipRanges, Int) Expr
-processPreEllipsis' t1@(ListElement vb idxb) t2@(ListElement ve idxe)
-    | vb /= ve      = error $ "PreEllipsis: Unequal lists: "++pp t1++" ... "++pp t2
+elliToComp' :: Expr -> Expr -> State (EllipRanges, Int) Expr
+elliToComp' t1@(ListElement vb idxb) t2@(ListElement ve idxe)
+    | vb /= ve      = error $ "Ellipsis: Unequal lists: "++pp t1++" ... "++pp t2
     | idxb == idxe  = return t1
     | otherwise     = do
         (rs, id) <- get
@@ -188,7 +188,7 @@ processPreEllipsis' t1@(ListElement vb idxb) t2@(ListElement ve idxe)
         put (newRange:rs, id+1)
         return $ EllipVar id
 
-processPreEllipsis' t1@(Index idxb) t2@(Index idxe)
+elliToComp' t1@(Index idxb) t2@(Index idxe)
     | idxb == idxe  = return t1
     | otherwise     = do
         (rs, id) <- get
@@ -196,30 +196,30 @@ processPreEllipsis' t1@(Index idxb) t2@(Index idxe)
         put (newRange:rs, id+1)
         return $ EllipVar id
 
-processPreEllipsis' (PreEllipsis t1b t2b) (PreEllipsis t1e t2e) 
-    = doTwo PreEllipsis (t1b, t2b) (t1e, t2e)
+elliToComp' (Ellipsis t1b t2b) (Ellipsis t1e t2e)
+    = doTwo Ellipsis (t1b, t2b) (t1e, t2e)
 
-processPreEllipsis' (App t1b t2b) (App t1e t2e)     = doTwo App (t1b, t2b) (t1e, t2e)
-processPreEllipsis' (Abstr vb tb) (Abstr ve te)     = if vb == ve
+elliToComp' (App t1b t2b) (App t1e t2e)     = doTwo App (t1b, t2b) (t1e, t2e)
+elliToComp' (Abstr vb tb) (Abstr ve te)     = if vb == ve
     then doOne (Abstr vb) tb te
-    else error $ "PreEllipsis: Unequal arguments: "++vb++ " ... "++ve
-processPreEllipsis' (Let vb tib tob) (Let ve tie toe) = if vb == ve
+    else error $ "Ellipsis: Unequal arguments: "++vb++ " ... "++ve
+elliToComp' (Let vb tib tob) (Let ve tie toe) = if vb == ve
     then doTwo (Let vb) (tib, tob) (tie, toe)
-    else error $ "PreEllipsis: Unequal let vars: "++vb++" ... "++ve
-processPreEllipsis' (Case _ _) (Case _ _) = error "PreEllipsis: Case not implemented"
-processPreEllipsis' (LetRec {}) (LetRec {}) = error "PreEllipsis: LetRec not implemented"
-processPreEllipsis' (ElliComp tb rsb) (ElliComp te rse) =
-    trace "Warning: PreEllipsis: Nested ellipsis are currently awkward" $
+    else error $ "Ellipsis: Unequal let vars: "++vb++" ... "++ve
+elliToComp' (Case _ _) (Case _ _) = error "Ellipsis: Case not implemented"
+elliToComp' (LetRec {}) (LetRec {}) = error "Ellipsis: LetRec not implemented"
+elliToComp' (ElliComp tb rsb) (ElliComp te rse) =
+    trace "Warning: Ellipsis: Nested ellipsis are currently awkward" $
     if rsb == rse
         then doOne (`ElliComp` rsb) tb te
-        else error "PreEllipsis: Not equal ranges (This could be changed in the future)"
-processPreEllipsis' (Cons t1b t2b) (Cons t1e t2e)   = doTwo Cons (t1b, t2b) (t1e,t2e)
-processPreEllipsis' (Cat t1b t2b) (Cat t1e t2e)     = doTwo Cat (t1b, t2b) (t1e,t2e)
-processPreEllipsis' (Error s1) (Error s2)             = return $ Error s1
-processPreEllipsis' (Add t1b t2b) (Add t1e t2e)     = doTwo Add (t1b, t2b) (t1e, t2e)
-processPreEllipsis' (Pair t1b t2b) (Pair t1e t2e)   = doTwo Pair (t1b, t2b) (t1e, t2e)
-processPreEllipsis' (EllipVar ib') (EllipVar ie')     = mergeEllipVars ib' ie'
-processPreEllipsis' (EllipVar idb') (ListElement ve idxe) = do
+        else error "Ellipsis: Not equal ranges (This could be changed in the future)"
+elliToComp' (Cons t1b t2b) (Cons t1e t2e)   = doTwo Cons (t1b, t2b) (t1e,t2e)
+elliToComp' (Cat t1b t2b) (Cat t1e t2e)     = doTwo Cat (t1b, t2b) (t1e,t2e)
+elliToComp' (Error s1) (Error s2)             = return $ Error s1
+elliToComp' (Add t1b t2b) (Add t1e t2e)     = doTwo Add (t1b, t2b) (t1e, t2e)
+elliToComp' (Pair t1b t2b) (Pair t1e t2e)   = doTwo Pair (t1b, t2b) (t1e, t2e)
+elliToComp' (EllipVar ib') (EllipVar ie')     = mergeEllipVars ib' ie'
+elliToComp' (EllipVar idb') (ListElement ve idxe) = do
     (rs, id) <- get
     let rb = rangesLookup rs idb'
     let newRange = EllipRange {ident=id, var=ve, ib=(ib rb), ie=idxe, contentT=BeList}
@@ -228,7 +228,7 @@ processPreEllipsis' (EllipVar idb') (ListElement ve idxe) = do
         then error "EllipVar ... ListElement with different lists" 
         else return $ EllipVar id
 
-processPreEllipsis' (ListElement vb idxb) (EllipVar ide')  = do
+elliToComp' (ListElement vb idxb) (EllipVar ide')  = do
     (rs, id) <- get
     let re = rangesLookup rs ide'
     let newRange = EllipRange {ident=id, var=vb, ib=idxb, ie=ib re, contentT=BeList}
@@ -237,19 +237,19 @@ processPreEllipsis' (ListElement vb idxb) (EllipVar ide')  = do
         then error "ListElement ... EllipVar with different lists" 
         else return $ EllipVar id
 
-processPreEllipsis' t1 t2 = if t1 == t2
+elliToComp' t1 t2 = if t1 == t2
     then return t1
     else error $ "Not implemented: "++show t1++" ... "++show t2
 
 doTwo :: (Expr -> Expr -> Expr) -> (Expr, Expr) -> (Expr,Expr) -> State (EllipRanges, Int) Expr
 doTwo con (t1b, t2b) (t1e, t2e) = do
-    t1eval <- processPreEllipsis' t1b t1e
-    t2eval <- processPreEllipsis' t2b t2e
+    t1eval <- elliToComp' t1b t1e
+    t2eval <- elliToComp' t2b t2e
     return $ con t1eval t2eval
 
 doOne :: (Expr -> Expr) -> Expr -> Expr -> State (EllipRanges, Int) Expr
 doOne con tb te = do
-    t <- processPreEllipsis' tb te
+    t <- elliToComp' tb te
     return $ con t
 
 getEllipsisIterators :: Env -> EllipRanges -> Env

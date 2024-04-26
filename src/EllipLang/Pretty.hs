@@ -30,7 +30,10 @@ pp' tabs (Case e alts)        =
     if all (\alt -> case fst alt of
             PVal (Boolean _) -> True
             _ -> False) alts && length alts == 2
-    then "if " ++ pp' tabs e ++ " then "  ++ pp' tabs (snd $ head $ filter (\x -> fst x == PVal (Boolean True)) alts) ++ pNewline tabs ++ "else " ++ pp' tabs (snd $ head $ filter (\x-> fst x == PVal (Boolean False)) alts)
+    then "if " ++ pp' tabs e ++ " then "  
+        ++ pp' tabs (snd $ head $ filter (\x -> fst x == PVal (Boolean True)) alts) 
+        ++ pNewline tabs ++ "else " 
+        ++ pp' tabs (snd $ head $ filter (\x-> fst x == PVal (Boolean False)) alts)
     else "case " ++ pp' tabs e ++ " of {" ++ ppMatch alts (tabs + 1) ++ pNewline (tabs) ++  "}"
 pp' tabs (LetRec  n e1 e2)    = "let " ++ n ++ " = " ++ pp' tabs e1 ++ pNewline tabs ++ "in " ++ pp' tabs e2
 pp' tabs (Cons e1 e2)         = "(" ++ pp' tabs e1 ++ ") : (" ++ pp' tabs e2 ++ ")"
@@ -56,13 +59,20 @@ pp' tabs (Not t)              = "not (" ++ pp' tabs t ++ ")"
 pp' tabs (Error s)            = "error \"" ++ s ++ "\""
 pp' tabs ellip@(ElliComp _ _) = ppEllip ellip
 pp' tabs (EllipVar i)         = "EllipVar(" ++ show i ++ ")"
-pp' tabs (PreEllipsis t1 t2)  = "(" ++ pp' tabs t1 ++ " ... " ++ pp' tabs t2 ++ ")"
+pp' tabs (Ellipsis t1 t2)  = "(" ++ pp' tabs t1 ++ " ... " ++ pp' tabs t2 ++ ")"
 pp' tabs (Index idx)          = ppIdx idx
-pp' tabs (PreEllipsisFold t1 t2 f) 
+pp' tabs (ElliFold t1 t2 f) 
     = "(" ++ pp' tabs t1 ++ " `" ++ pp' tabs f ++ "` ... `" ++ pp' tabs f ++ "` " ++ pp' tabs t2 ++ ")"
-pp' tabs t@ElliHaskellData {}
-    = show t
+pp' tabs (EHD ehd) = ppEHD ehd
 -- pp' tabs _            = "Error -- cannot display expression"
+
+makeElliAlias :: Name -> Id -> Name
+makeElliAlias n i = "__" ++ n ++ show i
+
+
+ppEHD :: ElliHaskellData -> String
+ppEHD ehd@(ElliHaskellData { ehs_id=Nothing }) = show ehd
+ppEHD ehd@(ElliHaskellData { ehs_name=n, ehs_id=Just id }) = makeElliAlias n id
 
 ppEllip :: Expr -> String
 ppEllip (ElliComp t rs) = let

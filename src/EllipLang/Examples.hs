@@ -213,7 +213,7 @@ add' = a <.> b <.> (a `Add` b)
 
 fold' :: Expr
 fold' = f <.> xs <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> PreEllipsisFold (x!.1) (x!n) f
+    (x, 1) <..> (x, n)  ==> ElliFold (x!.1) (x!n) f
     )
 
 
