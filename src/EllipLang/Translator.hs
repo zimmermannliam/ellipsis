@@ -4,7 +4,7 @@ import EllipLang.Syntax
 import EllipLang.Pretty (pp, makeElliAlias)
 import EllipLang.Eval (idxToExpr)
 import GenericHelper (everywhereUntil, mkTTMaybe, runStateEverywhere)
-import EllipLang.SmartCons ((<.>))
+import EllipLang.SmartCons ((<.>), inte)
 
 import Data.Generics 
 import qualified Data.Map as Map
@@ -17,7 +17,7 @@ data ElliClass = Fold Expr ElliClass
 type ListAliases = Map.Map Name Expr
 
 toZipWithN :: Int -> Expr
-toZipWithN i = (map Var [error "no 0 map", "map", "zipWith2", "zipWith3", "zipWith4", "zipWith5"]) !! i
+toZipWithN i = (map Var [error "no 0 map", "map", "zipWith", "zipWith3", "zipWith4", "zipWith5"]) !! i
 
 ------------------------------------------------------------------------
 -- 
@@ -26,31 +26,39 @@ toZipWithN i = (map Var [error "no 0 map", "map", "zipWith2", "zipWith3", "zipWi
 ------------------------------------------------------------------------
 
 translate :: Expr -> Expr
-translate = translate' Map.empty
+translate = unElli Map.empty
 
-translate' :: ListAliases -> Expr -> Expr
-translate' aliases = everywhereUntil (False `mkQ` isElliCase) (mkT (unElliCase aliases))
+unElli :: ListAliases -> Expr -> Expr
+unElli aliases = everywhereUntil (False `mkQ` isElli) (mkT (unElli' aliases))
 
-isElliCase :: Expr -> Bool
-isElliCase (Case _ alts) = (isElliPattern . fst) `any` alts
-    where
-    isElliPattern :: Pattern -> Bool
-    isElliPattern (PEllipsis _ _) = True
-    isElliPattern _ = False
-isElliCase _ = False
+-- Main function!
+unElli' :: ListAliases -> Expr -> Expr
+unElli' aliases (Ellipsis b e) =
+    case gzip (\x y -> mkTTMaybe combineElli x y) b e of
+        Just combinedT  -> let
+            (transformedT, (nZipWith, collection)) = runStateEverywhere transformCollectElli (0, []) combinedT
+            ranges = map (makeRange aliases) collection
+            in  foldl1 App ([toZipWithN nZipWith,
+                foldr ((<.>) . elliAliasData) transformedT collection]
+                ++ ranges)
 
-{-
-    ... case ...
-        / unElliCase
-    case <target> of <alts>
-                        / unElliAlts
-            { x1 ... xn -> <t>; ...}
-                           / unElliExpr
-                    ... (x1 ... xn) ...
-                         / unPreElli
-                        
--}
+        Nothing         -> error "unElli: bad structures"
+unElli' aliases (ListElement n idx) = Var "(!!)" `App` (aliases Map.! n) `App` (Index idx `Sub` inte 1)
+unElli' aliases c@(Case target alts)
+    | isElliCase c =
+        let alts' = map (unElliAlt aliases target) alts
+        in Case target alts'
+    | otherwise = c
+unElli' _ t = t
 
+isElli :: Expr -> Bool
+isElli (Ellipsis _ _) = True
+isElli t@(Case _ _)   = isElliCase t
+isElli _                 = False
+
+------------------------------------------------------------------------
+-- Edit case
+------------------------------------------------------------------------
 unElliCase :: ListAliases -> Expr -> Expr
 -- Can be used generically; takes a case with elli-haskell patterns
 -- and transforms them into mini-haskell expressions
@@ -59,55 +67,19 @@ unElliCase aliases c@(Case target alts) =
     in Case target alts'
 unElliCase aliases t = t
 
-addAliases :: Name -> Expr -> Idx -> ListAliases -> ListAliases
-addAliases listAlias target idx aliases =
-    let aliasMap = Map.fromList [(listAlias, target)]
-        idxAlias = Map.fromList (
-            case idxToName idx of {
-                Just lenName -> [(lenName, App (Var "length") target)];
-                Nothing -> [];
-            })
-    in aliases `Map.union` aliasMap `Map.union` idxAlias
-    where
-    idxToName :: Idx -> Maybe Name
-    idxToName i = case idxToExpr i of
-        Var n   -> Just n
-        _       -> Nothing
-
 unElliAlt :: ListAliases -> Expr -> (Pattern, Expr) -> (Pattern, Expr)
 -- Takes an elli-haskell alt and turns it into a non-elli-haskell alt.
 unElliAlt aliases target (PEllipsis listAlias len, t) = 
     let aliases' = addAliases listAlias target len aliases
-        t' = unElliAltBody aliases' t
+        lenLet = maybe id (\n -> Let n (aliases' Map.! n)) (idxToName len)
+        t' = lenLet $ unElli aliases' t
     in (PVar "_", t')
 unElliAlt _ _ alt = alt
 
-unElliAltBody :: ListAliases -> Expr -> Expr
-unElliAltBody aliases = everywhereUntil (False `mkQ` isElli) (mkT (unElli aliases)) -- make until pre ellip
-
-elliAliasData :: ElliHaskellData -> Expr
-elliAliasData (ElliHaskellData {ehs_name=n, ehs_id=Just id}) = Var (makeElliAlias n id)
-elliAliasData _ = error "elliAliasData"
-
-makeRange :: ListAliases -> ElliHaskellData -> Expr
-makeRange aliases ElliHaskellData { ehs_name=n, ehs_ib=ib, ehs_ie=ie } = 
-    Var "range" `App` (aliases Map.! n) `App` idxToExpr ib `App` idxToExpr ie
-
-unElli :: ListAliases -> Expr -> Expr
-unElli aliases (Ellipsis b e) =
-    case gzip (\x y -> mkTTMaybe combineElli x y) b e of
-        Just combinedT  -> let
-            (transformedT, (nZipWith, collection)) = runStateEverywhere transformCollectElli (0, []) combinedT
-            in toZipWithN nZipWith 
-                `App` foldr ((<.>) . elliAliasData) transformedT collection
-                `App` foldr1 (\x y -> App x y) (map (makeRange aliases) collection)
-
-        Nothing         -> error "unElli: bad structures"
-unElli aliases (ListElement n idx) = Var "(!!)" `App` (aliases Map.! n) `App` Index idx
-unElli _ t = t
-
--- Eventually: make a gzip that handles this:
-data GZipCase a = J a | Continue | BadStructure
+------------------------------------------------------------------------
+-- Edit ellipsis
+------------------------------------------------------------------------
+-- elliExprTransformCollect :: Expr -> Expr -> State (Id, 
 
 combineElli :: Expr -> Expr -> Maybe Expr
 combineElli (ListElement nb ib) (ListElement ne ie) 
@@ -118,7 +90,8 @@ combineElli (ListElement nb ib) (ListElement ne ie)
         , ehs_ie=ie
         , ehs_name=nb
         , ehs_id = Nothing } -- to be set later
-combineElli _ _ = Nothing -- do nothing
+combineElli l r = if toConstr l == toConstr r then Nothing -- do nothing
+    else error "combineElli bad l r"
 
 transformCollectElli :: ElliHaskellData -> State (Id, [ElliHaskellData]) ElliHaskellData
 transformCollectElli ehd@(ElliHaskellData {}) = do
@@ -126,7 +99,6 @@ transformCollectElli ehd@(ElliHaskellData {}) = do
     let new_ehd = ehd { ehs_id=Just id }
     put (id+1, new_ehd:ehds)
     return new_ehd
-
 
 ------------------------------------------------------------------------
 -- 
@@ -152,6 +124,36 @@ isCore = everything (&&) (True `mkQ` isCore')
 -- 
 ------------------------------------------------------------------------
 
-isElli :: Expr -> Bool
-isElli (Ellipsis _ _) = True
-isElli _                 = False
+isElliCase :: Expr -> Bool
+isElliCase (Case _ alts) = (isElliPattern . fst) `any` alts
+    where
+    isElliPattern :: Pattern -> Bool
+    isElliPattern (PEllipsis _ _) = True
+    isElliPattern _ = False
+isElliCase _ = False
+
+makeRange :: ListAliases -> ElliHaskellData -> Expr
+makeRange aliases ElliHaskellData { ehs_name=n, ehs_ib=ib, ehs_ie=ie } = 
+    Var "range" `App` (aliases Map.! n) `App` idxToExpr ib `App` idxToExpr ie
+
+elliAliasData :: ElliHaskellData -> Expr
+elliAliasData (ElliHaskellData {ehs_name=n, ehs_id=Just id}) = Var (makeElliAlias n id)
+elliAliasData _ = error "elliAliasData"
+
+addAliases :: Name -> Expr -> Idx -> ListAliases -> ListAliases
+addAliases listAlias target idx aliases =
+    let aliasMap = Map.fromList [(listAlias, target)]
+        idxAlias = Map.fromList (
+            case idxToName idx of {
+                Just lenName -> [(lenName, App (Var "length") target)];
+                Nothing -> [];
+            })
+    in aliases `Map.union` aliasMap `Map.union` idxAlias
+
+-- Eventually: make a gzip that handles this:
+data GZipCase a = J a | Continue | BadStructure
+
+idxToName :: Idx -> Maybe Name
+idxToName i = case idxToExpr i of
+    Var n   -> Just n
+    _       -> Nothing
