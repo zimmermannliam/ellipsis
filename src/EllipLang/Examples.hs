@@ -36,6 +36,8 @@ prelude' = Map.fromList
     , (NamedVar "length", BVal $ eval Map.empty length')
     , (NamedVar "map", BVal $ eval Map.empty mapRecursive)
     , (NamedVar "zipWith", BVal $ eval Map.empty zipWith')
+    , (NamedVar "drop", BVal $ eval Map.empty drop')
+    , (NamedVar "take", BVal $ eval Map.empty take')
     ]
 
 prelude = Map.union prelude' $ Map.fromList
@@ -70,13 +72,41 @@ cat' =
     -- in
     (Var "cat") `App` list1 `App` list2
 
+drop' :: Expr
+drop' =
+    n <.> list <.> LetRec "drop" (k <.> xs <.> Case (k `Leq` inte 0) -- of
+    [
+        (PVal $ Boolean True, xs),
+        (PVal $ Boolean False, Case xs -- of
+        [
+            (PVal Empty, xs),
+            (PCons "y" "ys", Var "drop" `App` (k `Sub` inte 1) `App` ys)
+        ])
+    ])
+    -- in
+    (Var "drop") `App` n `App` list
+    
+take' :: Expr
+take' =
+    n <.> list <.> LetRec "take" (k <.> xs <.> Case (k `Leq` inte 0) -- of
+    [
+        (PVal $ Boolean True, Value Empty),
+        (PVal $ Boolean False, Case xs -- of
+        [
+            (PVal Empty, Value Empty),
+            (PCons "y" "ys", Cons y (Var "take" `App` (k `Sub` inte 1) `App` ys))
+        ])
+    ])
+    -- in
+    (Var "take") `App` n `App` list
+
 length' :: Expr
 length' =
     list1 <.> LetRec "length" (l1 <.>
         Case l1 -- of
         [
             (PVal Empty, inte 0),
-            (PCons "x" "xs", inte 0 `Add` (Var "length" `App` xs))
+            (PCons "x" "xs", inte 1 `Add` (Var "length" `App` xs))
         ]
     )
     -- in
@@ -109,18 +139,50 @@ zipWith' =
         -- in
         (Var "zipWith") `App` g `App` list1 `App` list2
 
+-- For map
+succ' :: Expr
+succ' = x <.> x `Add` inte 1
+
+------------------------------------------------------------------------
 -- Example functions
+------------------------------------------------------------------------
 
-firstK :: Expr
-firstK = xs <.> k <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> (x!.1) <...> (x!k)
+map' :: Expr
+map' = f <.> xs <.> case1 xs (
+    (x, 1) <..> (x, n)  ==> (f `App` (x!.1)) <...> (f `App` (x!n))
     )
 
-removeKth :: Expr
-removeKth = xs <.> k <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> 
-        (x!.1 <...> x!(k `Sub` inte 1)) `Cat` (x!(k `Add` inte 1) <...> x!n)
+zip' :: Expr
+zip' = 
+    xs <.> ys <.> case1 xs (
+        (x, 1) <..> (x, n)  ==> case1 ys (
+                (y, 1) <..> (y, m) ==> (x!.1 `Pair` y!.1) <...> (x!n `Pair` y!m)
+        )
     )
+
+fold' :: Expr
+fold' = f <.> xs <.> case1 xs (
+    (x, 1) <..> (x, n)  ==> ElliFold (x!.1) (x!n) f
+    )
+
+pairAdj :: Expr
+pairAdj = xs <.> case1 xs (
+    (x, 1) <..> (x, n)  ==> (x!.1 `Pair` x!.2) <...> (x!(n `Sub` inte 1) `Pair` x!n)
+    )
+
+rotL :: Expr
+rotL = xs <.> k <.> case1 xs (
+    (x, 1) <..> (x, n)  ==> Let "k'" (k `Mod` n) $
+        (x!(k' `Add` inte 1) <...> x!n) `Cat` (x!.1 <...> x!k')
+    )
+
+inits' :: Expr
+inits' = Abstr "xs" $ Case xs -- of
+    [(PEllipsis "x" (End "n"),
+        (x!.1 <...> x!.1)
+        <...>
+        (x!.1 <...> x!n)
+    )]
 
 binSearch' :: Expr
 binSearch' = Var "binSearch"
@@ -137,27 +199,6 @@ binSearch = list <.> term <.> LetRec "binSearch" (xs <.> t <.>
     ) -- in
     (binSearch' `App` list `App` term)
 
-zip' :: Expr
-zip' = 
-    xs <.> ys <.> case1 xs (
-        (x, 1) <..> (x, n)  ==> case1 ys (
-                (y, 1) <..> (y, m) ==> (x!.1 `Pair` y!.1) <...> (x!n `Pair` y!m)
-        )
-    )
-
-combinations :: Expr
-combinations = 
-    xs <.> ys <.> 
-        case1 xs (
-        (x, 1) <..> (x, n)  ==> 
-            case1 ys (
-                (y, 1) <..> (y, m) ==>
-                    ((x!.1 `Pair` y!.1) <...> (x!.1 `Pair` y!m))
-                    <...>
-                    ((x!n `Pair` y!.1) <...> (x!n `Pair` y!m))
-            )
-        )
-
 subLists :: Expr
 subLists = Abstr "list" $
     LetRec "sublists" (Abstr "xs" $ Case xs -- of
@@ -172,6 +213,30 @@ subLists = Abstr "list" $
     (App (Var "sublists") (Var "list"))
 
 
+combinations :: Expr
+combinations = 
+    xs <.> ys <.> 
+        case1 xs (
+        (x, 1) <..> (x, n)  ==> 
+            case1 ys (
+                (y, 1) <..> (y, m) ==>
+                    ((x!.1 `Pair` y!.1) <...> (x!.1 `Pair` y!m))
+                    <...>
+                    ((x!n `Pair` y!.1) <...> (x!n `Pair` y!m))
+            )
+        )
+
+firstK :: Expr
+firstK = xs <.> k <.> case1 xs (
+    (x, 1) <..> (x, n)  ==> (x!.1) <...> (x!k)
+    )
+
+removeKth :: Expr
+removeKth = xs <.> k <.> case1 xs (
+    (x, 1) <..> (x, n)  ==> 
+        (x!.1 <...> x!(k `Sub` inte 1)) `Cat` (x!(k `Add` inte 1) <...> x!n)
+    )
+
 pairWithHead :: Expr
 pairWithHead = Abstr "xs" $ Case xs -- of
     [(PEllipsis "x" (End "n"),
@@ -180,41 +245,8 @@ pairWithHead = Abstr "xs" $ Case xs -- of
         ((x!.1) `Pair` (x!n))
     )]
 
-inits' :: Expr
-inits' = Abstr "xs" $ Case xs -- of
-    [(PEllipsis "x" (End "n"),
-        (x!.1 <...> x!.1)
-        <...>
-        (x!.1 <...> x!n)
-    )]
-
-rotL :: Expr
-rotL = xs <.> k <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> Let "k'" (k `Mod` n) $
-        (x!(k' `Add` inte 1) <...> x!n) `Cat` (x!.1 <...> x!k')
-    )
-
-pairAdj :: Expr
-pairAdj = xs <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> (x!.1 `Pair` x!.2) <...> (x!(n `Sub` inte 1) `Pair` x!n)
-    )
-
--- For map
-succ' :: Expr
-succ' = x <.> x `Add` inte 1
-
-map' :: Expr
-map' = f <.> xs <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> (f `App` (x!.1)) <...> (f `App` (x!n))
-    )
-
 add' :: Expr
 add' = a <.> b <.> (a `Add` b)
-
-fold' :: Expr
-fold' = f <.> xs <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> ElliFold (x!.1) (x!n) f
-    )
 
 
 
