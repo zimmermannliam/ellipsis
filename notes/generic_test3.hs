@@ -108,14 +108,6 @@ treeToListSp :: Tree -> [Int]
 treeToListSp (Leaf i) = [i]
 treeToListSp (Branch l r) = (treeToList l) ++ (treeToList r)
 
-{-
-treeToList :: Tree -> [Int]
-treeToList = everything (++) (mkQ [] treeToList')
-    where
-    treeToList' (Leaf i) = [i]
-    treeToList' _        = []
-    -}
-
 treeToList :: Tree -> [Int]
 treeToList t = (treeToList' t) ++ (concat $ gmapQ (mkQ [] treeToList) t)
     where
@@ -253,6 +245,7 @@ zipTreeWithState' l r = evalState (treeZip l r) 0
         _ -> if toConstr l == toConstr r then gzipWithM treeZip l r
         else error "bad"
 
+{-
 leafZip :: LeafThing -> LeafThing -> State Int LeafThing
 leafZip (LeafThing l) (LeafThing r) = do
     id <- get
@@ -269,8 +262,19 @@ leafZip' (Leaf l) (Leaf r) = Just (go l r)
         put (id+1)
         return $ Leaf $ l + r + (id * 1000)
 leafZip' _ _ = Nothing
+-}
 
 
+
+gizpM :: (Monad m, Typeable m)
+    => (forall a. Data a => a -> (forall b. Data b => b -> MaybeT m b))
+    -> (forall c. Data c => c -> (forall d. Data d => d -> m d))
+gzipM f x y = 
+    let res = runMaybeT (f x y)
+    in case 
+
+
+{-
 gzipM :: (Monad m, Typeable m) 
     => (forall a. Data a => a -> (forall b. Data b => b -> Maybe (m b)))
     -> (forall c. Data c => c -> (forall d. Data d => d -> Maybe (m d)))
@@ -283,8 +287,8 @@ gzipM f x y = Just (gzipM' f x y)
         Just res    -> res
         Nothing     -> if toConstr x == toConstr y
             then gzipWithM (gzipM' f) x y
-            else error "gzipM: Structure mismatch"
-
+            else error $ "gzipM: Structure mismatch: " ++ gshow x ++ " ||| " ++ gshow y
+-}
 
 mkMM :: (Monad m, Typeable m, Data a)
     => (a -> a -> m a)
