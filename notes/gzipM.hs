@@ -26,9 +26,9 @@ mkMMMaybeT :: (Monad m, Typeable m, Data a)
 mkMMMaybeT f x y =
     case (cast x, cast y) of
         (Just (x' :: a), Just (y' :: a)) -> case cast (f x' y') of
-            Just (res :: MaybeT m c) -> res
-            _                        -> mzero
-        _                            -> mzero
+                Just (res :: MaybeT m c)    -> res
+                _                           -> mzero
+        _                                -> mzero
 
 
 ------------------------------------------------------------------------
