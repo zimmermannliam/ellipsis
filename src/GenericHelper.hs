@@ -11,6 +11,7 @@ module GenericHelper where
 
 import Data.Generics
 import Control.Monad.State
+import Debug.Trace (trace)
 
 everywhereUntil :: GenericQ Bool -> GenericT -> GenericT
 -- Variation on everywhere:
@@ -47,7 +48,7 @@ gzipM f x y = Just (gzipM' f x y)
         Just res    -> res
         Nothing     -> if toConstr x == toConstr y
             then gzipWithM (gzipM' f) x y
-            else error "gzipM: Structure mismatch"
+            else error $ "gzipM: Structure mismatch: " ++ gshow x ++ " ||| " ++ gshow y
 
 
 mkMM :: (Monad m, Typeable m, Data a)
