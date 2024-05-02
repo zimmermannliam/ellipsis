@@ -41,11 +41,11 @@ prelude' = Map.fromList
     ]
 
 prelude = Map.union prelude' $ Map.fromList
-    [ (NamedVar "ranges", BVal $ eval prelude' ranges')
+    [ (NamedVar "range", BVal $ eval prelude' range')
     ]
 
-ranges' :: Expr
-ranges' = 
+range' :: Expr
+range' = 
     xs <.> begin <.> end <.> Case (begin `Lt` inte 1) --of
     [
         (PVal $ Boolean True, Value Empty),
@@ -118,7 +118,7 @@ mapRecursive =
         Case l1 -- of
         [
             (PVal Empty, Value Empty),
-            (PCons "x" "xs", (f `App` xs) `Cons` (Var "map" `App` f `App` xs))
+            (PCons "x" "xs", (f `App` x) `Cons` (Var "map" `App` f `App` xs))
         ]
     ) -- in
     (Var "map") `App` g `App` list1
@@ -156,7 +156,16 @@ zip' :: Expr
 zip' = 
     xs <.> ys <.> case1 xs (
         (x, 1) <..> (x, n)  ==> case1 ys (
-                (y, 1) <..> (y, m) ==> (x!.1 `Pair` y!.1) <...> (x!n `Pair` y!m)
+                (y, 1) <..> (y, m) ==> ((x!.1) `Pair` (y!.1)) <...> ((x!n) `Pair` (y!m))
+        )
+    )
+zip3' :: Expr
+zip3' =
+    xs <.> ys <.> zs <.> case1 xs (
+        (x, 1) <..> (x, n) ==> case1 ys (
+            (y, 1) <..> (y, m) ==> case1 zs (
+                (z, 1) <..> (z, k) ==> ((x!.1) `Pair` (y!.1) `Pair` (z!.1)) <...> ((x!n) `Pair` (y!n) `Pair` (z!n))
+            )
         )
     )
 
@@ -167,21 +176,21 @@ fold' = f <.> xs <.> case1 xs (
 
 pairAdj :: Expr
 pairAdj = xs <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> (x!.1 `Pair` x!.2) <...> (x!(n `Sub` inte 1) `Pair` x!n)
+    (x, 1) <..> (x, n)  ==> ((x!.1) `Pair` (x!.2)) <...> ((x!(n `Sub` inte 1)) `Pair` (x!n))
     )
 
 rotL :: Expr
 rotL = xs <.> k <.> case1 xs (
     (x, 1) <..> (x, n)  ==> Let "k'" (k `Mod` n) $
-        (x!(k' `Add` inte 1) <...> x!n) `Cat` (x!.1 <...> x!k')
+        ((x!(k' `Add` inte 1)) <...> (x!n)) `Cat` ((x!.1) <...> (x!k'))
     )
 
 inits' :: Expr
 inits' = Abstr "xs" $ Case xs -- of
     [(PEllipsis "x" (End "n"),
-        (x!.1 <...> x!.1)
+        ((x!.1) <...> (x!.1))
         <...>
-        (x!.1 <...> x!n)
+        ((x!.1) <...> (x!n))
     )]
 
 binSearch' :: Expr
@@ -192,9 +201,9 @@ binSearch = list <.> term <.> LetRec "binSearch" (xs <.> t <.>
     Case xs -- of
         [   PVal Empty          ==> false
         ,   (x, 1) <..> (x, n)  ==> Let "k" ((n `Div` inte 2) `Add` inte 1) $
-                if' (x!k `Eq` t)             true
-                else' $ if' (x!k `Gt` t)    (binSearch' `App` (x!.1 <...> x!(k `Sub` inte 1)) `App` t)
-                else'                       (binSearch' `App` (x!(k `Add` inte 1) <...> x!n) `App` t)
+                if' ((x!k) `Eq` t)          true
+                else' $ if' (x!k `Gt` t)    (binSearch' `App` ((x!.1) <...> (x!(k `Sub` inte 1))) `App` t)
+                else'                       (binSearch' `App` ((x!(k `Add` inte 1)) <...> (x!n)) `App` t)
         ]
     ) -- in
     (binSearch' `App` list `App` term)
@@ -205,9 +214,9 @@ subLists = Abstr "list" $
     [
     (PVal Empty, Value Empty),
     (PEllipsis "x" (End "n"),
-        ((x!.1 <...> x!.1) <...> (x!.1 <...> x!n))
+        (((x!.1) <...> (x!.1)) <...> ((x!.1) <...> (x!n)))
         `Cat` 
-        App (Var "sublists") (x!.2 <...> x!n)
+        App (Var "sublists") ((x!.2) <...> (x!n))
     )])
     --in
     (App (Var "sublists") (Var "list"))
@@ -220,9 +229,9 @@ combinations =
         (x, 1) <..> (x, n)  ==> 
             case1 ys (
                 (y, 1) <..> (y, m) ==>
-                    ((x!.1 `Pair` y!.1) <...> (x!.1 `Pair` y!m))
+                    (((x!.1) `Pair` (y!.1)) <...> ((x!.1) `Pair` (y!m)))
                     <...>
-                    ((x!n `Pair` y!.1) <...> (x!n `Pair` y!m))
+                    (((x!n) `Pair` (y!.1)) <...> ((x!n) `Pair` (y!m)))
             )
         )
 
@@ -234,7 +243,7 @@ firstK = xs <.> k <.> case1 xs (
 removeKth :: Expr
 removeKth = xs <.> k <.> case1 xs (
     (x, 1) <..> (x, n)  ==> 
-        (x!.1 <...> x!(k `Sub` inte 1)) `Cat` (x!(k `Add` inte 1) <...> x!n)
+        ((x!.1) <...> (x!(k `Sub` inte 1))) `Cat` ((x!(k `Add` inte 1)) <...> (x!n))
     )
 
 pairWithHead :: Expr
@@ -248,8 +257,28 @@ pairWithHead = Abstr "xs" $ Case xs -- of
 add' :: Expr
 add' = a <.> b <.> (a `Add` b)
 
+enumerate :: Expr
+enumerate = xs <.> case1 xs (
+    (x, 1) <..> (x, n) ==> 
+        ((x!.1) `Pair` (inte 1))
+        <...>
+        ((x!n) `Pair` n)
+    )
 
-
+tryElliGroup :: Expr
+tryElliGroup = xs <.> a <.> b <.> case1 xs (
+    (x, 1) <..> (x, n) ==>
+        ((x!.1) `Pair` (ElliGroup $ a `Add` (inte 1)))
+        <...>
+        ((x!n) `Pair` (ElliGroup $ b `Add` (inte 5)))
+    )
+tryElliGroup2 :: Expr
+tryElliGroup2 = xs <.> a <.> b <.> case1 xs (
+    (x, 1) <..> (x, n) ==>
+        ((x!.1) `Pair` (a `Add` (inte 1)))
+        <...>
+        ((x!n) `Pair` (b `Add` (inte 5)))
+    )
 
 {-
 groupBy' :: Expr

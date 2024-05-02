@@ -17,8 +17,8 @@ import Control.Monad.State
 import Data.Function ((&))
 
 import EllipLang.Syntax
-import EllipLang.Pretty (pp, ppVal, ppEnv)
-import EllipLang.SmartCons ( listToVCons, unVCons, ycomb )
+import EllipLang.Pretty (pp, ppVal, ppEnv, makeElliAlias)
+import EllipLang.SmartCons ( listToVCons, unVCons, ycomb, vcons )
 
 
 ------------------------------------------------------------------------
@@ -32,7 +32,7 @@ eval :: Env -> Expr -> Val
 eval e (Var vn) = evalBinding e (envLookup e vn)
 eval e (App t1 t2) = case eval e t1 of
     Closure x t1b e2 -> eval (Map.insert (NamedVar x) (BVal $ eval e t2) e2) t1b
-    _           -> errorOut e "Expected fn to be applied"
+    _           -> errorOut e $ "Expected fn (" ++ pp t1 ++ ") to be applied"
 eval e (Abstr x t) = Closure x t e
 
 eval e (Value v)            = v
@@ -105,28 +105,33 @@ eval e (Not t) = case eval e t of
 -- Arithmetic operators
 eval e (Add t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 + i2)
-    (v1, v2)            -> errorOut' e $ "Bad add terms: " ++ show v1 ++ " + " ++ show v2
+    (v1, v2)            -> errorOut e $ "Bad add terms: " ++ show v1 ++ " + " ++ show v2
 eval e (Sub t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 - i2)
-    (v1, v2)            -> errorOut' e $ "Bad sub terms: " ++ show v1 ++ " - " ++ show v2
+    (v1, v2)            -> errorOut e $ "Bad sub terms: " ++ show v1 ++ " - " ++ show v2
 eval e (Mul t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 * i2)
-    _                   -> errorOut' e "Bad mul terms"
+    _                   -> errorOut e "Bad mul terms"
 eval e (Div t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 `div` i2)
-    _                   -> errorOut' e "Bad div terms"
+    _                   -> errorOut e "Bad div terms"
 eval e (Mod t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 `mod` i2)
-    _                   -> errorOut' e "Bad mod terms"
+    _                   -> errorOut e "Bad mod terms"
 eval e (Abs t) = case eval e t of
     (Con i)             -> Con (abs i)
-    _                   -> errorOut' e "Bad abs term"
+    _                   -> errorOut e "Bad abs term"
 
 eval e (Infix f t1 t2) = eval e (f `App` t1 `App` t2)
 eval e (ElliFold t1 tn f) = 
     let list = unVCons (eval e (Ellipsis t1 tn))
     in eval e $ foldValToExpr (\a b -> f `App` a `App` b) list
+eval e (Btwn t1 t2) = case (eval e t1, eval e t2) of
+    (Con i1, Con i2) -> vcons [i1..i2]
+    _                -> error "bad btwn"
+eval e (ER r) = eval e $ Var (makeElliAlias r)
 
+eval e (ElliGroup _) = errorOut e "Can't eval elligroups"
 
 foldValToExpr :: (Expr -> Expr -> Expr) -> [Val] -> Expr
 foldValToExpr f []      = error "Tried to foldValToExpr an empty list"
@@ -310,7 +315,7 @@ boundsCheck e ellipEnv = all (boundsCheck' e) iterators
         && (case content of
             List l -> it_ie - it_ib <= length l
             _ -> True)
-    boundsCheck' e _ = errorOut' e "Tried to boundscheck a non-iterator"
+    boundsCheck' e _ = errorOut e "Tried to boundscheck a non-iterator"
 
 reverseCons :: Val -> Val
 reverseCons l = listToVCons $ reverseCons' l
@@ -330,7 +335,7 @@ iterateCons :: Env -> Val -> Expr -> String -> Int -> Val
 iterateCons _ _ _ _ 0     = Empty
 iterateCons e Empty _ _ i = errorOut e $ "Empty too soon; i: " ++ show i
 iterateCons e (VCons x xs) t n i   = VCons (eval e $ replaceVar n x t) (iterateCons e xs t n (i-1))
-iterateCons e _ _ _ _     = errorOut' e "Non-cons somehow in iterator"
+iterateCons e _ _ _ _     = errorOut e "Non-cons somehow in iterator"
 
 replaceVar :: String -> Val -> Expr -> Expr
 replaceVar n valin = everywhere (mkT $ replaceVar' n valin)
@@ -366,15 +371,15 @@ findListFutureElement e (ListFuture n) i = findNthElement
                 IPlace i    ->  i
                 End n       ->  valEvalInt $ eval e (Var n)
 
-findListFutureElement e _ _ = errorOut' e "Bad list future element search"
+findListFutureElement e _ _ = errorOut e "Bad list future element search"
 
 
-errorOut :: Env -> String -> Val
-errorOut e s = error (s ++ "; Environment: " ++ ppEnv e)
-
-
-errorOut' :: Env -> String -> a
-errorOut' e s = error (s ++ "; Environment: " ++ ppEnv e)
+errorOut :: Env -> String -> a
+errorOut e s = error (s ++ "; Environment: " ++ ppEnv (Map.filter (not . isClosure) e))
+    where
+    isClosure :: Bindee -> Bool
+    isClosure (BVal (Closure {})) = True
+    isClosure _ = False
 
 
 catVCons :: Val -> Val -> Val

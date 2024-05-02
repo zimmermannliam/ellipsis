@@ -7,6 +7,7 @@ import EllipLang.Syntax
 
 import Data.Generics ( mkT, everywhere )
 import Data.List
+import qualified Data.Map as Map
 
 pNewline :: Int -> String
 pNewline i = "\n" ++ pTabs i
@@ -23,7 +24,7 @@ pp = pp' 0
 pp' :: Int -> Expr -> String
 pp' tabs (Var n)      = n
 pp' tabs (App e1 e2)  = pp' tabs e1 ++ " (" ++ pp' tabs e2 ++ ")"
-pp' tabs (Abstr n e)  = "\\" ++ n ++ " -> (" ++ pp' tabs e ++ ")"
+pp' tabs t@(Abstr n e)  = ppAbstr tabs t
 pp' tabs (Value v)    = ppVal v
 pp' tabs (Let n e1 e2)        = "let " ++ n ++ " = " ++ pp' tabs e1  ++ " in " ++ pNewline (tabs+1) ++ pp' (tabs+1) e2
 pp' tabs (Case e alts)        = 
@@ -63,16 +64,21 @@ pp' tabs (Ellipsis t1 t2)  = "(" ++ pp' tabs t1 ++ " ... " ++ pp' tabs t2 ++ ")"
 pp' tabs (Index idx)          = ppIdx idx
 pp' tabs (ElliFold t1 t2 f) 
     = "(" ++ pp' tabs t1 ++ " `" ++ pp' tabs f ++ "` ... `" ++ pp' tabs f ++ "` " ++ pp' tabs t2 ++ ")"
-pp' tabs (EHD ehd) = ppEHD ehd
+pp' tabs (ER r)             = makeElliAlias r
+pp' tabs (Btwn t1 t2) = "[" ++ pp' tabs t1 ++ ".." ++ pp' tabs t2 ++ "]"
+pp' tabs (ElliGroup t) = "[" ++ pp' tabs t ++ "]"
 -- pp' tabs _            = "Error -- cannot display expression"
 
-makeElliAlias :: Name -> Id -> Name
-makeElliAlias n i = "__" ++ n ++ show i
-
-
-ppEHD :: ElliHaskellData -> String
-ppEHD ehd@(ElliHaskellData { ehs_id=Nothing }) = show ehd
-ppEHD ehd@(ElliHaskellData { ehs_name=n, ehs_id=Just id }) = makeElliAlias n id
+ppAbstr :: Int -> Expr -> String
+ppAbstr tabs t = let 
+    (head, body) = getNestedAbstr t
+    in "\\" ++ head ++ "-> " ++ pp' (tabs+1) body
+    where
+    getNestedAbstr :: Expr -> (String, Expr)
+    getNestedAbstr (Abstr n t) = 
+        let (head, body) = getNestedAbstr t
+        in (n ++ " " ++ head, body)
+    getNestedAbstr t = ("", t)
 
 ppEllip :: Expr -> String
 ppEllip (ElliComp t rs) = let
@@ -142,7 +148,13 @@ ppBindee (BVal v)   = ppVal v
 ppBindee _          = "list future or lenght future"
 
 ppEnv :: Env -> String
-ppEnv e     = "<\n" ++ show e ++ ">"
+ppEnv e     = "<\n" ++ foldr (\l r -> l ++ "\n" ++ r) "" (map ppBinding (Map.toList e)) ++ ">"
+    where
+    ppBinding :: (Identifier, Bindee) -> String
+    ppBinding (NamedVar n, r) = n ++ " ==> " ++ ppBindee r
+    ppBinding (_, r) = "_ ==> " ++ ppBindee r
+
+    
 
 rangeLookup :: EllipRanges -> Int -> EllipRange
 rangeLookup rs i = case filter (\r -> ident r == i) rs of
@@ -158,6 +170,13 @@ idxToExpr :: Idx -> Expr
 idxToExpr (EPlace t) = t
 idxToExpr (IPlace i) = Value $ Con i
 idxToExpr (End n)    = Var n
+
+makeElliAlias :: ElliRange -> Name
+makeElliAlias ElliRange {ed_t=t, ed_id=id} = makeElliAlias' t id
+    where
+    makeElliAlias' :: ElliType -> Id -> Name
+    makeElliAlias' (ElliList n) i = "__" ++ n ++ show i
+    makeElliAlias' ElliCounter i = "__" ++ show i
 
 
 miniHaskellPrelude = foldr1 (\l r -> l ++ "\n" ++ r)

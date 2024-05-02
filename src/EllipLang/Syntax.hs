@@ -34,24 +34,27 @@ data Expr = Var Name                -- Variable
           | Div Expr Expr
           | Mod Expr Expr
           | Abs Expr
-          | EllipVar Id
+          | Btwn Expr Expr
           | Ellipsis Expr Expr
           | ElliFold Expr Expr Expr -- (t1) + ... + (tn) would be ElliFold t1 t2 +
+          -- Processing stuff
+          | EllipVar Id
           | Index Idx
           | Infix Expr Expr Expr
-          | EHD ElliHaskellData
+          | ER ElliRange
+          | ElliGroup Expr
           deriving (Eq, Show, Data, Typeable)
+{-
 infix 8 `Pair`
 infix 8 `Gt`
 infix 8 `Lt`
 infix 8 `Geq`
-infix 8 `Leq`
+infix 8 `Leq`-}
 
-data ElliHaskellData = ElliHaskellData { ehs_ib :: Idx
-                            , ehs_ie :: Idx
-                            , ehs_name :: Name
-                            , ehs_id :: Maybe Int }
-          deriving (Eq, Show, Data, Typeable)
+data ElliRange = ElliRange {ed_id::Id, ed_t::ElliType, ed_ib::Expr, ed_ie::Expr}
+    deriving (Eq, Show, Data, Typeable)
+data ElliType = ElliList Name | ElliCounter
+    deriving (Eq, Show, Data, Typeable)
 
 data Val    = Con Int 
               | VCons Val Val
