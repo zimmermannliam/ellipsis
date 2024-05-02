@@ -5,3 +5,4 @@ cabal.project.local
 cabal.project.local~
 megaparsec
 *.code-workspace
+notes/run.hs
