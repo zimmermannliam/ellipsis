@@ -15,7 +15,7 @@
               "state": {
                 "file": "daily/2024-04-22.md",
                 "mode": "source",
-                "source": true
+                "source": false
               }
             }
           },
@@ -25,9 +25,9 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "daily/2024-04-25.md",
+                "file": "daily/2024-05-01.md",
                 "mode": "source",
-                "source": true
+                "source": false
               }
             }
           },
@@ -39,7 +39,7 @@
               "state": {
                 "file": "Todo.md",
                 "mode": "source",
-                "source": true
+                "source": false
               }
             }
           }
@@ -110,7 +110,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "daily/2024-04-25.md",
+                "file": "daily/2024-05-01.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -127,7 +127,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "daily/2024-04-25.md",
+                "file": "daily/2024-05-01.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -150,7 +150,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "daily/2024-04-25.md"
+                "file": "daily/2024-05-01.md"
               }
             }
           }
@@ -173,11 +173,13 @@
   },
   "active": "6630e11fc0d456b4",
   "lastOpenFiles": [
-    "Todo.md",
-    "daily/2024-04-25.md",
-    "daily/2024-04-24.md",
+    "daily/2024-04-26.md",
+    "daily/2024-05-01.md",
     "Meeting 2024-04-22.md",
     "Meeting 2024-4ish.md",
+    "daily/2024-04-25.md",
+    "Todo.md",
+    "daily/2024-04-24.md",
     "daily/2024-04-22.md",
     "Combinations.canvas",
     "daily/2024-04-19.md",
