@@ -4,8 +4,13 @@ import Test.HUnit
 
 import qualified EllipLang.Examples as Ex
 import EllipLang.Translator
+import EllipLang.Eval (eval)
+import EllipLang.Syntax
+import EllipLang.SmartCons (vcons)
 
-main = runTestTTAndExit $ test $ testIsCore
+prelude = Ex.prelude
+
+main = runTestTTAndExit $ test $ testIsCore ++ testTranslate
 
 testIsCore = map ("isCore" ~:)
     [ isCore Ex.foldRecursive ~?= True
@@ -27,3 +32,11 @@ testIsCore = map ("isCore" ~:)
     , isCore Ex.map' ~?= False
     , isCore Ex.fold' ~?= False
     ]
+
+testTranslate = 
+    map 
+        (\(actual, expected) -> "translate" ~: eval prelude (translate actual) 
+            ~?= expected)
+        [ (Ex.map' `App` Ex.succ' `App` Ex.exList, vcons $ map succ Ex.exList')
+        , (Ex.map' `App` Ex.succ' `App` Ex.exList2, vcons $ map succ Ex.exList2')
+        ]
