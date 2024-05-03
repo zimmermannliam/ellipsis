@@ -58,7 +58,8 @@ common shared
                         megaparsec,
                         parser-combinators,
                         parsec,
-                        MissingH
+                        MissingH,
+                        transformers
     other-extensions: 
     other-modules:      GenericHelper
 
