@@ -9,9 +9,11 @@
 
 module GenericHelper where
 
-import Data.Generics
-import Control.Monad.State
-import Debug.Trace (trace)
+import Data.Generics (Data, Typeable, GenericT, GenericQ, GenericM, gzipWithM, toConstr, cast, gmapT)
+import Control.Monad.Trans.Maybe (MaybeT)
+import Control.Monad (mzero, guard)
+import Control.Monad.Trans (lift)
+import Control.Applicative ((<|>))
 
 everywhereUntil :: GenericQ Bool -> GenericT -> GenericT
 -- Variation on everywhere:
@@ -23,48 +25,42 @@ everywhereUntil q f = go
         | q x       = f x
         | otherwise = f (gmapT go x)
 
+gzipM :: (Monad m, Typeable m)
+    => GenericQ (GenericM (MaybeT m)) -> GenericQ (GenericM (MaybeT m))
+-- Run a generic zip through two structures using a generic function f.
+-- If f returns MaybeT Nothing (mzero), then zip into that structure.
+-- Returns MaybeT Nothing on a structure mismatch.
+gzipM f x y = do
+    f x y <|> if toConstr x == toConstr y
+        then gzipWithM (gzipM f) x y
+        else mzero
 
-
-mkTTMaybe :: (Typeable a, Typeable b, Typeable c) => 
-    (a -> a -> Maybe a) -> b -> c -> Maybe c
--- Takes a function that, on nothing, will be traversed into.
-mkTTMaybe f x y = case (cast x, cast y) of
-    (Just (x'::a), Just (y'::a))    -> maybe Nothing cast (f x' y')
-    _                               -> Nothing
-
-
-runStateEverywhere :: (Data a, Data b) => (b -> State s b) -> s -> a -> (a, s)
-runStateEverywhere f initState t = runState (everywhereM (mkM f) t) initState
-
-gzipM :: (Monad m, Typeable m) 
-    => (forall a. Data a => a -> (forall b. Data b => b -> Maybe (m b)))
-    -> (forall c. Data c => c -> (forall d. Data d => d -> Maybe (m d)))
-gzipM f x y = Just (gzipM' f x y)
-    where
-    gzipM' :: (Monad m, Typeable m) 
-        => (forall a. Data a => a -> (forall b. Data b => b -> Maybe (m b)))
-        -> (forall c. Data c => c -> (forall d. Data d => d -> m d))
-    gzipM' f x y = case (f x y) of
-        Just res    -> res
-        Nothing     -> if toConstr x == toConstr y
-            then gzipWithM (gzipM' f) x y
-            else error $ "gzipM: Structure mismatch: " ++ gshow x ++ " ||| " ++ gshow y
-
-
+mkMMMaybeT :: (Monad m, Typeable m, Data a)
+    => (a -> a -> MaybeT m a) 
+    -> (forall b. Data b => b -> forall c. Data c => c -> MaybeT m c)
+-- Make a function :: a -> a -> MaybeT m a (where MaybeT Nothing 
+-- indicates "continue zipping") into a general function that zips into
+-- types that do not match f.
+-- Note that:
+-- (forall b. Data b => b -> forall c. Data c => c -> MaybeT m c)
+-- is the same as GenericQ (GenericM (MaybeT m))
+mkMMMaybeT f x y =
+    case (cast x, cast y) of
+        (Just (x' :: a), Just (y' :: a)) -> case cast (f x' y') of
+                Just (res :: MaybeT m c)    -> res
+                _                           -> mzero
+        _                                -> mzero
 mkMM :: (Monad m, Typeable m, Data a)
     => (a -> a -> m a)
-    -> (forall b. Data b => b -> (forall c. Data c => c -> Maybe (m c)))
-mkMM f x y = 
+    -> (forall b. Data b => b -> forall c. Data c => c -> MaybeT m c)
+-- Make a function :: a -> a -> m a. Will only operate on args of
+-- type a, otherwise it will continue zipping.
+-- Note that:
+-- (forall b. Data b => b -> forall c. Data c => c -> MaybeT m c)
+-- is the same as GenericQ (GenericM (MaybeT m))
+mkMM f x y =
     case (cast x, cast y) of
-        (Just (x' :: a), Just (y' :: a)) -> cast (f x' y')
-        _                                -> Nothing
-
-mkMMMaybe :: (Monad m, Typeable m, Data a)
-    => (a -> a -> Maybe (m a))
-    -> (forall b. Data b => b -> (forall c. Data c => c -> Maybe (m c)))
-mkMMMaybe f x y =
-    case (cast x, cast y) of
-        (Just (x' :: a), Just (y' :: a)) -> case (f x' y') of
-            Just res -> cast res
-            Nothing  -> Nothing
-        _                                -> Nothing
+        (Just (x' :: a), Just (y' :: a)) -> case cast (f x' y') of
+                Just (res :: m c)           -> res
+                _                           -> mzero
+        _                                -> mzero

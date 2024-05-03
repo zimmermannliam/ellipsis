@@ -3,13 +3,17 @@ module EllipLang.Translator where
 import EllipLang.Syntax
 import EllipLang.Pretty (pp, makeElliAlias)
 import EllipLang.Eval (idxToExpr)
-import GenericHelper (everywhereUntil, mkMMMaybe, gzipM)
 import EllipLang.SmartCons ((<.>), inte)
+
+import GenericHelper (everywhereUntil, mkMMMaybeT, gzipM)
 
 import Data.Generics 
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
-import Control.Monad.State ( State, evalState, runState, MonadState(put, get), join)
+import Control.Monad.State (State, evalState, runState, MonadState(put, get))
+import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
+import Control.Monad (mzero, guard)
+import Control.Monad.Trans (lift)
+
 import Debug.Trace (trace, traceShowId)
 
 data ElliClass = Fold Expr ElliClass
@@ -20,7 +24,6 @@ type ListAliases = Map.Map Name Expr
 toZipWithN :: Int -> Expr
 toZipWithN i = (map Var ["id", "map", "zipWith", "zipWith3", "zipWith4", "zipWith5"]) !! i
 
-type ElliState = (Id, [ElliRange])
 
 ------------------------------------------------------------------------
 -- 
@@ -41,91 +44,90 @@ translate' t = let translated = unElli Map.empty t
 
 unElli :: ListAliases -> Expr -> Expr
 unElli aliases = everywhereUntil (False `mkQ` isElli) (mkT (unElli' aliases))
-
--- Main function!
-unElli' :: ListAliases -> Expr -> Expr
-unElli' aliases (Ellipsis b e) = elliTransform aliases b e
-unElli' aliases (ListElement n idx) = Var "(!!)" `App` (aliases Map.! n) `App` (Index idx `Sub` inte 1)
-unElli' aliases c@(Case target alts)
-    | isElliCase c =
-        let alts' = map (unElliAlt aliases target) alts
-        in Case target alts'
-    | otherwise = c
-unElli' _ t = t
-
-isElli :: Expr -> Bool
-isElli (Ellipsis _ _) = True
-isElli t@(Case _ _)   = isElliCase t
-isElli _                 = False
+  where
+    unElli' :: ListAliases -> Expr -> Expr
+    unElli' aliases (Ellipsis b e) = elliTransform aliases b e
+    unElli' aliases (ListElement n idx) = Var "(!!)" `App` (aliases Map.! n) `App` (Index idx `Sub` inte 1)
+    unElli' aliases c@(Case target alts)
+        | isElliCase c =
+            let alts' = map (unElliAlt aliases target) alts
+            in Case target alts'
+        | otherwise = c
+    unElli' _ t = t
+    isElli :: Expr -> Bool
+    isElli (Ellipsis _ _) = True
+    isElli t@(Case _ _)   = isElliCase t
+    isElli _                 = False
 
 ------------------------------------------------------------------------
 -- Edit ellipsis
 ------------------------------------------------------------------------
 
-elliTransform :: ListAliases -> Expr -> Expr -> Expr
-elliTransform aliases b e = case runState  (elliTransform' aliases b e) (0, []) of
-    (r, s) -> r
+type ElliState = (Id, [ElliRange])
 
-elliTransform' :: ListAliases -> Expr -> Expr -> State ElliState Expr
+elliTransform :: ListAliases -> Expr -> Expr -> Expr
+elliTransform aliases b e =
+    case evalState (runMaybeT (elliTransform' aliases b e)) (0, []) of
+        Just r  -> r
+        Nothing -> error "Could not transform ellipsis: Bad structure."
+
+elliTransform' :: ListAliases -> Expr -> Expr -> MaybeT (State ElliState) Expr
 elliTransform' aliases b e = do
-    transformedTree <- fromMaybe 
-            (error "Elli transform: bad structure") 
-            (gzipM (mkMMMaybe (elliTransformCollect aliases)) b e)
-    (nZipWith, collectedRanges) <- get
+    transformedTree <- gzipM (mkMMMaybeT (elliTransformCollect aliases)) b e
+    (_, collectedRanges) <- lift get
     let mappedFn = foldr ((<.>) . Var . makeElliAlias) transformedTree collectedRanges
+    let nZipWith = length collectedRanges
     let ranges = map (makeRange aliases) collectedRanges
     return $ foldl1 App $
         [ toZipWithN nZipWith
         , mappedFn
         ] ++ ranges
 
-elliTransformCollect :: ListAliases -> Expr -> Expr -> Maybe (State ElliState Expr)
-elliTransformCollect _ (ListElement nl idxl) (ListElement nr idxr) 
-    | nl /= nr      = error "ListElements are different"
-    | otherwise     = Just x
-      where x = do {
-          (id, rs) <- get
-        ; let er = ElliRange {ed_id=id, ed_t=ElliList nl, ed_ib=idxToExpr idxl, ed_ie=idxToExpr idxr}
-        ; put (id+1, er:rs)
-        ; return $ ER er
-        }
-            -- this is bit of a hack. The reason I'm not using MaybeT is because
-            -- the outer "maybe" is intended to mean "change nothing and continue
-            -- traversing", not "failure".
-elliTransformCollect aliases (Ellipsis ll lr) (Ellipsis rl rr) = Just x
-    where 
-    x = do {
-    ; s@(id,rs) <- get
-    ; let l = evalState (elliTransform' aliases ll lr) s
-    ; let r = evalState (elliTransform' aliases rl rr) s
-    ; case gzipM (mkMMMaybe (elliTransformCollect aliases)) l r of
-        Just res -> res
-        Nothing -> error "bad"
-  }
-elliTransformCollect aliases (ER l) (ER r) | ed_id l == ed_id r = Just (return $ ER l)
-                                           | otherwise          = Nothing
-elliTransformCollect aliases (ElliGroup l) (ElliGroup r) = Just x
-    where x = do {
-          (id, rs) <- get
-        ; let er = ElliRange {ed_id=id, ed_t=ElliCounter, ed_ib=l, ed_ie=r}
-        ; put (id+1, er:rs)
-        ; return $ ER er
-    }
-elliTransformCollect _ l r 
-    | not (isElliAble l && isElliAble r) = Nothing -- Continue
-    | l == r    = Nothing
-    | otherwise = Just x
-    where x = do {
-          (id, rs) <- get
-        ; let er = ElliRange {ed_id=id, ed_t=ElliCounter, ed_ib=l, ed_ie=r}
-        ; put (id+1, er:rs)
-        ; return $ ER er
-    }
 
-isElliAble :: Expr -> Bool
-isElliAble (Value (Con _))  = True
-isElliAble (Var _)          = True
-isElliAble _                = False
+elliTransformCollect :: ListAliases -> Expr -> Expr -> MaybeT (State ElliState) Expr
+
+elliTransformCollect _ (ListElement nl idxl) (ListElement nr idxr)
+    | nl /= nr      = error "ListElements are different"
+    | otherwise = do
+        (id, rs) <- lift get
+        let er = ElliRange {ed_id=id, ed_t=ElliList nl, ed_ib=idxToExpr idxl, ed_ie=idxToExpr idxr}
+        lift $ put (id+1, er:rs)
+        return $ ER er
+
+elliTransformCollect aliases (Ellipsis ll lr) (Ellipsis rl rr) = do
+    s@(id,rs) <- lift get
+    -- These computations are contained and do not affect state, other than
+    -- increasing the id for the purpose of disambiguation.
+    let (l, (idl, _)) = runState (runMaybeT $ elliTransform' aliases ll lr) s
+    let (r, (idr, _)) = runState (runMaybeT $ elliTransform' aliases rl rr) s
+    case (l, r) of
+        (Just l', Just r') -> do
+            lift $ put (id+idl,rs)
+            gzipM (mkMMMaybeT (elliTransformCollect aliases)) l' r'
+        _ -> mzero
+
+elliTransformCollect aliases (ER l) (ER r) | ed_id l == ed_id r = return $ ER l
+                                           | otherwise          = mzero
+
+elliTransformCollect aliases (ElliGroup l) (ElliGroup r) = do
+    (id, rs) <- lift get
+    let er = ElliRange {ed_id=id, ed_t=ElliCounter, ed_ib=l, ed_ie=r}
+    lift $ put (id+1, er:rs)
+    return $ ER er
+
+elliTransformCollect _ l r 
+    | not (isElliAble l && isElliAble r) = mzero -- Continue
+    | l == r    = mzero
+    | otherwise = do
+        (id, rs) <- lift get
+        let er = ElliRange {ed_id=id, ed_t=ElliCounter, ed_ib=l, ed_ie=r}
+        lift $ put (id+1, er:rs)
+        return $ ER er
+  where
+    isElliAble :: Expr -> Bool
+    isElliAble (Value (Con _))  = True
+    isElliAble (Var _)          = True
+    isElliAble _                = False
 
 ------------------------------------------------------------------------
 -- Edit case
@@ -189,9 +191,6 @@ addAliases listAlias target idx aliases =
                 Nothing -> [];
             })
     in aliases `Map.union` aliasMap `Map.union` idxAlias
-
--- Eventually: make a gzip that handles this:
-data GZipCase a = J a | Continue | BadStructure
 
 idxToName :: Idx -> Maybe Name
 idxToName i = case idxToExpr i of
