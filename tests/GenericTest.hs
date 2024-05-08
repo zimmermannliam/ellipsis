@@ -15,6 +15,7 @@ data Tree = Branch Tree Tree | Leaf Int | Leaf2 Int
 
 main = runTestTT $ test 
     [ (labL ++ " " ++ labR) ~: gEvalLeafZip l r ~?= allEvalLeafZip l r | (labL, l) <- trs, (labR, r) <- trs ]
+--    ++ [ ]
 
 tr1 = (Leaf 5) `Branch` ((Leaf 6) `Branch` (Leaf 7))
 tr2 = (Leaf 10) `Branch` ((Leaf 11) `Branch` (Leaf 12))

@@ -29,10 +29,10 @@ testSmartCons = map ("smart cons" ~:)
             (x, 1) <..> (x, n) ==> (x!.1 `Add` inte 1) <...> (x!n `Add` inte 1)
         )
         ) ~?= Abstr "x" (Case x 
-            [(PEllipsis "x" (End "n"), 
-                Add (ListElement "x" (EPlace $ Value $ Con 1)) (Value $ Con 1)
+            [(PEllipsis "x" (Var "n"), 
+                Add (ListElement "x" (Value $ Con 1)) (Value $ Con 1)
                 `Ellipsis`
-                Add (ListElement "x" (EPlace $ Var "n")) (Value $ Con 1)
+                Add (ListElement "x" (Var "n")) (Value $ Con 1)
             )])
     ]
 

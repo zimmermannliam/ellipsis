@@ -24,7 +24,7 @@ myLists = [
 [exList', exList2', exList3', exList4', exList5', exList6'] = myLists
 
 exList, exList2, exList3, exList4, exList5, exList6 :: Expr
-[exList, exList2, exList3, exList4, exList5, exList6] = map cons myLists
+[exList, exList2, exList3, exList4, exList5, exList6] = map icons myLists
 
 exListV, exList2V, exList3V, exList4V, exList5V, exList6V :: Val
 [exListV, exList2V, exList3V, exList4V, exList5V, exList6V] = map vcons myLists
@@ -41,11 +41,12 @@ prelude' = Map.fromList
     ]
 
 prelude = Map.union prelude' $ Map.fromList
-    [ (NamedVar "range", BVal $ eval prelude' range')
+    [ (NamedVar "listRange", BVal $ eval prelude' listRange')
+    , (NamedVar "range", BVal $ eval prelude' range')
     ]
 
-range' :: Expr
-range' = 
+listRange' :: Expr
+listRange' = 
     xs <.> begin <.> end <.> Case (begin `Lt` inte 1) --of
     [
         (PVal $ Boolean True, Value Empty),
@@ -59,6 +60,14 @@ range' =
             ])
         ])
     ]
+
+
+range' :: Expr
+range' =
+    l <.> r <.> Case (l `Leq` r) -- of
+        [ (PVal $ Boolean True,     Btwn l r)
+        , (PVal $ Boolean False,    Var "reverse" `App` Btwn r l)
+        ]
 
 cat' :: Expr
 cat' =
@@ -143,9 +152,15 @@ zipWith' =
 succ' :: Expr
 succ' = x <.> x `Add` inte 1
 
+
 ------------------------------------------------------------------------
 -- Example functions
 ------------------------------------------------------------------------
+
+reverse' :: Expr
+reverse' = xs <.> case1 xs (
+    (x, 1) <..> (x, n) ==> (x!n) <...> (x!.1)
+    )
 
 map' :: Expr
 map' = f <.> xs <.> case1 xs (
@@ -187,12 +202,53 @@ rotL = xs <.> k <.> case1 xs (
 
 inits' :: Expr
 inits' = Abstr "xs" $ Case xs -- of
-    [(PEllipsis "x" (End "n"),
+    [(PEllipsis "x" (Var "n"),
         ((x!.1) <...> (x!.1))
         <...>
         ((x!.1) <...> (x!n))
     )]
 
+inits2 :: Expr
+inits2 = Abstr "xs" $ Case xs -- of
+    [(PEllipsis "x" (Var "n"),
+        Value Empty
+        <...>
+        ((x!.1) <...> (x!n))
+    )]
+
+inits2Backwards :: Expr
+inits2Backwards = Abstr "xs" $ Case xs -- of
+    [(PEllipsis "x" (Var "n"),
+        ((x!.1) <...> (x!n))
+        <...>
+        Value Empty
+    )]
+
+inits3 :: Expr
+inits3 = Abstr "xs" $ Case xs -- of
+    [(PEllipsis "x" n,
+        (Cons (ListElement "x" (inte 1)) (Value Empty))
+        <...>
+        ((x!.1) <...> (x!n))
+    )]
+
+
+-- zipInits [x1...xn] [y1...ym] = [[(x1, y1)], [(x1, y1), (x2, y2)], ..., [(x1, y1)...(xn,ym)]]
+-- zipInits [x1...xn] [y1...ym] = [[(x1, y1)]]++[[(x1, y1), (x2, y2)], ..., [(x1, y1)...(xn,ym)]]
+zipInits :: Expr
+zipInits = xs <.> ys <.> Case xs -- of
+    [(PEllipsis "x" n,
+        Case ys -- of
+            [( PEllipsis "y" m, 
+                Var "(++)"
+                `App` Cons (Cons (Pair (x!.1) (y!.1)) (Value Empty)) (Value Empty)
+                `App` (
+                    Cons (Pair (x!.1) (y!.1)) (Cons (Pair (x!.2) (y!.2)) (Value Empty))
+                    <...>
+                    (Pair (x!.1) (y!.1) <...> Pair (x!n) (y!m))
+                )
+            )]
+    )]
 binSearch' :: Expr
 binSearch' = Var "binSearch"
 
@@ -213,7 +269,7 @@ subLists = Abstr "list" $
     LetRec "sublists" (Abstr "xs" $ Case xs -- of
     [
     (PVal Empty, Value Empty),
-    (PEllipsis "x" (End "n"),
+    (PEllipsis "x" (Var "n"),
         (((x!.1) <...> (x!.1)) <...> ((x!.1) <...> (x!n)))
         `Cat` 
         App (Var "sublists") ((x!.2) <...> (x!n))
@@ -248,7 +304,7 @@ removeKth = xs <.> k <.> case1 xs (
 
 pairWithHead :: Expr
 pairWithHead = Abstr "xs" $ Case xs -- of
-    [(PEllipsis "x" (End "n"),
+    [(PEllipsis "x" (Var "n"),
         ((x!.1) `Pair` (x!.2))
         <...>
         ((x!.1) `Pair` (x!n))
@@ -280,41 +336,19 @@ tryElliGroup2 = xs <.> a <.> b <.> case1 xs (
         ((x!n) `Pair` (b `Add` (inte 5)))
     )
 
-{-
-groupBy' :: Expr
-groupBy' = f <.> list <.> LetRec "groupBy" (
-    Let "k" (
-    )  -- in
-    (Var "groupBy") `App` f `App` list
-subArrays' :: Expr
-subArrays' = Abstr "l" $ Abstr "k" $ Case l -- of
-    [
-        (PVal Empty, Value Empty),
-        (PEllipsis "x" (End "n"), Ellipsis 
-            (Ellipsis x0 [EllipRange {ident=0, var="x", ib=EPlace x1, ie=EPlace (x1 `Add` k `Sub` Value (Con 1)), contentT=BeList}]) [EllipRange {ident=1, var="x", ib=IPlace 1, ie=EPlace (n `Sub` k `Add` Value (Con 1)), contentT=BeIndices}])
-    ]
+scanl1' :: Expr
+scanl1' = f <.> xs <.> case1 xs (
+    (x, 1) <..> (x, n) ==>
+        ((Var "foldl1") `App` f `App` ((x!.1) <...> (x!.1)))
+        <...>
+        ((Var "foldl1") `App` f `App` ((x!.1) <...> (x!n)))
+    )
 
-indices' :: Expr
-indices' = Abstr "l" $ Case l -- of
-    [
-        (PEllipsis "x" (End "n"), Ellipsis x0 [EllipRange {ident=0, var="", ib=IPlace 1, ie=EPlace n, contentT=BeIndices}])
-    ]
-
-mergeSort' :: Expr
-mergeSort' = Abstr "l" $ LetRec "mergeSort" -- =
-    (Abstr "list" $ Case (Var "list") -- of
-    [
-        (PVal Empty, Value Empty),
-        (PEllipsis "x" (End "n"), 
-
-        )
-        (PEllipsis "x" (End "n"), )
-    -- in
-    (App (Var "mergeSort") (Var "l"))
-
-merge' :: Expr
-merge = Abstr "l1" $ Abstr "l2"
--}
+------------------------------------------------------------------------
+-- 
+-- Recursive functions
+-- 
+------------------------------------------------------------------------
 
 foldRecursive :: Expr
 foldRecursive = Abstr "l" $ Abstr "f" $

@@ -9,8 +9,8 @@
 
 module GenericHelper where
 
-import Data.Generics (Data, Typeable, GenericT, GenericQ, GenericM, gzipWithM, toConstr, cast, gmapT)
-import Control.Monad.Trans.Maybe (MaybeT)
+import Data.Generics (Data, Typeable, GenericT, GenericQ, GenericM, gzipWithM, toConstr, cast, gmapT, gmapQ, gzipWithQ)
+import Control.Monad.Trans.Maybe
 import Control.Monad (mzero, guard)
 import Control.Monad.Trans (lift)
 import Control.Applicative ((<|>))
@@ -64,3 +64,43 @@ mkMM f x y =
                 Just (res :: m c)           -> res
                 _                           -> mzero
         _                                -> mzero
+
+-- | zip and query like everything
+gzipQ :: forall r. (Show r) => (r -> r -> r) -> GenericQ (GenericQ (Either r r)) -> GenericQ (GenericQ (Maybe r))
+gzipQ k f x y = go x y 
+  where
+    go :: (Show r) => GenericQ (GenericQ (Maybe r))
+    go x y = case (f x y) of
+        Right res -> Just res
+        Left res  -> 
+            if toConstr x == toConstr y 
+            then do
+                next <- sequence $ gzipWithQ go x y
+                return $ foldl k res next
+            else Nothing
+
+
+-- | Default, query, left, right
+-- use with gzipQ
+mkQQ :: (Typeable b, Data b) => r -> (b -> b -> r) -> GenericQ (GenericQ (Either r r))
+mkQQ dflt q x y = case (cast x, cast y) of
+    (Just (x'::b), Just (y'::b)) -> Right (q x' y')
+    _                            -> Left (dflt)
+
+-- | Default, query, left, right
+-- use with gzipQ
+mkQQMaybe :: (Typeable b, Data b) => r -> (b -> b -> Maybe r) -> GenericQ (GenericQ (Either r r))
+mkQQMaybe dflt q x y = case (cast x, cast y) of
+    (Just (x'::b), Just (y'::b)) -> case q x' y' of
+        Just res -> Right res
+        Nothing  -> Left dflt
+    _                            -> Left dflt
+
+hoistMaybe :: (Applicative m) => Maybe b -> MaybeT m b
+hoistMaybe = MaybeT . pure
+
+mapWithIdx :: (Int -> a -> b) -> [a] -> [b]
+mapWithIdx f xs = map (uncurry f) $ enumerate xs
+  where
+    enumerate :: [a] -> [(Int, a)]
+    enumerate = zip [0..]

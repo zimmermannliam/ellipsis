@@ -14,8 +14,11 @@ false = Value $ Boolean False
 con :: Int -> Expr
 con i = Value $ Con i
 
-cons :: [Int] -> Expr
-cons l = foldr1 Cons (map con l ++ [Value Empty])
+icons :: [Int] -> Expr
+icons l = foldr1 Cons (map con l ++ [Value Empty])
+
+cons :: [Expr] -> Expr
+cons = foldr Cons (Value Empty)
 
 vcons :: [Int] -> Val
 vcons = foldr (VCons . Con) Empty
@@ -42,6 +45,12 @@ vPairVCons xs =
         & map (\(l,r) -> VPair (Con l) (Con r))
         & foldr VCons Empty
 
+unConsSafe :: Expr -> Maybe [Expr]
+unConsSafe (Value Empty) = Just []
+unConsSafe (Cons x xs)   = fmap (x:) (unConsSafe xs)
+unConsSafe _             = Nothing
+
+
 unCons :: Expr -> [Expr]
 unCons = unfoldr unCons'
     where
@@ -59,12 +68,12 @@ unVCons = unfoldr unVCons'
     unVCons' v              = error $ "Unexpected unVCons': " ++ show v
 
 (!.) :: Expr -> Int -> Expr
-(Var n) !. i = ListElement n $ EPlace $ Value $ Con i
+(Var n) !. i = ListElement n $ Value $ Con i
 t !. i      = error $ "Bad !.: " ++ show t ++ "!." ++ show i
 infixl 9 !.
 
 (!) :: Expr -> Expr -> Expr
-(Var n) ! t = ListElement n (EPlace t)
+(Var n) ! t = ListElement n (t)
 infixl 9 !
 
 (<+>) :: Expr -> Expr -> Expr
@@ -91,7 +100,7 @@ infixr 0 ==>
 
 (<..>) :: (Expr, a) -> (Expr, Expr) -> Pattern
 (Var v1, _) <..> (Var v2, Var n)    | v1 /= v2  = error "bad smart constructor"
-                                    | otherwise = PEllipsis v1 (End n)
+                                    | otherwise = PEllipsis v1 (Var n)
 
 if' :: Expr -> Expr -> String -> Expr -> Expr
 if' pred termTrue _ termFalse = Case pred [(PVal $ Boolean True, termTrue), (PVal $ Boolean False, termFalse)]

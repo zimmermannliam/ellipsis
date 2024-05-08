@@ -73,10 +73,7 @@ data Pattern = PCons Name Name
              | PEllipsis Name Idx -- x1 ... xn -> x2 ... xn
              deriving (Eq, Show, Data, Typeable)
 
-data Idx    = IPlace Int        -- Reflect work they're doing -- 
-            | End Name 
-            | EPlace Expr -- Must evaluate to an integer
-            deriving (Eq, Show, Data, Typeable)
+type Idx = Expr
 
 -- Bindee?
 data Bindee    = BVal Val

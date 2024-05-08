@@ -23,6 +23,8 @@ pp = pp' 0
 
 pp' :: Int -> Expr -> String
 pp' tabs (Var n)      = n
+pp' tabs (Var "(++)" `App` t@(Cons _ _) `App` (Ellipsis l r)) = 
+    "[" ++ ppList tabs t ++ "," ++ pp' tabs l ++ ",...," ++ pp' tabs r ++ "]"
 pp' tabs (App e1 e2)  = pp' tabs e1 ++ " (" ++ pp' tabs e2 ++ ")"
 pp' tabs t@(Abstr n e)  = ppAbstr tabs t
 pp' tabs (Value v)    = ppVal v
@@ -37,10 +39,12 @@ pp' tabs (Case e alts)        =
         ++ pp' tabs (snd $ head $ filter (\x-> fst x == PVal (Boolean False)) alts)
     else "case " ++ pp' tabs e ++ " of {" ++ ppMatch alts (tabs + 1) ++ pNewline (tabs) ++  "}"
 pp' tabs (LetRec  n e1 e2)    = "let " ++ n ++ " = " ++ pp' tabs e1 ++ pNewline tabs ++ "in " ++ pp' tabs e2
-pp' tabs (Cons e1 e2)         = "(" ++ pp' tabs e1 ++ ") : (" ++ pp' tabs e2 ++ ")"
+pp' tabs t@(Cons _ _)         = "[" ++ ppList tabs t ++ "]"
 pp' tabs (Pair t1 t2) = "(" ++ pp' tabs t1 ++ ", " ++ pp' tabs t2 ++ ")"
 pp' tabs (Cat t1 t2) = pp' tabs t1 ++ " ++ " ++ pp' tabs t2
-pp' tabs (ListElement n i) = n ++ "[" ++ ppIdx i ++ "]"
+pp' tabs (ListElement n (Var i))    = n ++ i
+pp' tabs (ListElement n (Value (Con i)))    = n ++ show i
+pp' tabs (ListElement n i)    = n ++ "{" ++ ppIdx i ++ "}"
 pp' tabs (Add e1 e2)          = pp' tabs e1 ++ "+" ++ pp' tabs e2
 pp' tabs (Sub t1 t2)          = pp' tabs t1 ++ "-" ++ pp' tabs t2
 pp' tabs (Mul t1 t2)          = pp' tabs t1 ++ "*" ++ pp' tabs t2
@@ -60,7 +64,7 @@ pp' tabs (Not t)              = "not (" ++ pp' tabs t ++ ")"
 pp' tabs (Error s)            = "error \"" ++ s ++ "\""
 pp' tabs ellip@(ElliComp _ _) = ppEllip ellip
 pp' tabs (EllipVar i)         = "EllipVar(" ++ show i ++ ")"
-pp' tabs (Ellipsis t1 t2)  = "(" ++ pp' tabs t1 ++ " ... " ++ pp' tabs t2 ++ ")"
+pp' tabs (Ellipsis t1 t2)  = "[" ++ pp' tabs t1 ++ ",...," ++ pp' tabs t2 ++ "]"
 pp' tabs (Index idx)          = ppIdx idx
 pp' tabs (ElliFold t1 t2 f) 
     = "(" ++ pp' tabs t1 ++ " `" ++ pp' tabs f ++ "` ... `" ++ pp' tabs f ++ "` " ++ pp' tabs t2 ++ ")"
@@ -68,6 +72,11 @@ pp' tabs (ER r)             = makeElliAlias r
 pp' tabs (Btwn t1 t2) = "[" ++ pp' tabs t1 ++ ".." ++ pp' tabs t2 ++ "]"
 pp' tabs (ElliGroup t) = "[" ++ pp' tabs t ++ "]"
 -- pp' tabs _            = "Error -- cannot display expression"
+
+ppList :: Int -> Expr -> String
+ppList tabs (Value Empty) = ""
+ppList tabs (Cons t (Value Empty)) = pp' tabs t
+ppList tabs (Cons t ts) = pp' tabs t ++ "," ++ ppList tabs ts
 
 ppAbstr :: Int -> Expr -> String
 ppAbstr tabs t = let 
@@ -101,11 +110,10 @@ ellipVarToListElement rs side t@(EllipVar id) = let r = rangeLookup' rs id
 ellipVarToListElement rs side (ElliComp t innerRs) = ElliComp t mappedInnerRs
     where 
     mappedInnerRs   = map (\x -> x { ib=case ib x of
-        EPlace t' -> EPlace $ ellipExprReplace rs side t'
-        otherIdx  -> otherIdx
+        t' -> ellipExprReplace rs side t'
         , ie=case ie x of
-        EPlace t' -> EPlace $ ellipExprReplace rs side t'
-        otherIdx  -> otherIdx}) innerRs
+        t' -> ellipExprReplace rs side t'
+        }) innerRs
     -- innerTerm       = ellipExprReplace (rs ++ mappedInnerRs) side t
 ellipVarToListElement _ _ t = t
 
@@ -122,9 +130,9 @@ ppPattern (PEllipsis n i) = strn ++ "1 ... " ++ strn ++ ppIdx i
 ppPattern (PCons' t1 t2) = "(" ++ pp' 0 t1 ++ ":" ++ pp' 0 t2 ++ ")"
 
 ppIdx :: Idx -> String
-ppIdx (IPlace i)   = show i
-ppIdx (End n)     = n
-ppIdx (EPlace t) = pp' 0 t
+ppIdx (Value (Con i))   = show i
+ppIdx (Var n)     = n
+ppIdx (t) = pp' 0 t
 
 ppVal :: Val -> String
 ppVal (Con i)       = if i >= 0 then show i else "(" ++ show i ++ ")"
@@ -167,16 +175,14 @@ rangeLookup' :: EllipRanges -> Int -> Maybe EllipRange
 rangeLookup' rs i = find (\r -> ident r == i) rs
 
 idxToExpr :: Idx -> Expr
-idxToExpr (EPlace t) = t
-idxToExpr (IPlace i) = Value $ Con i
-idxToExpr (End n)    = Var n
+idxToExpr = id
 
 makeElliAlias :: ElliRange -> Name
 makeElliAlias ElliRange {ed_t=t, ed_id=id} = makeElliAlias' t id
     where
     makeElliAlias' :: ElliType -> Id -> Name
-    makeElliAlias' (ElliList n) i = "__" ++ n ++ show i
-    makeElliAlias' ElliCounter i = "__" ++ show i
+    makeElliAlias' (ElliList n) i = "_" ++ n ++ show i
+    makeElliAlias' ElliCounter i = "_" ++ show i
 
 
 miniHaskellPrelude = foldr1 (\l r -> l ++ "\n" ++ r)

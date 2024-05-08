@@ -1,4 +1,4 @@
-module Main where
+module GzipM where
 
 import Data.Generics (Data, Typeable, GenericQ, GenericM, gzipWithM, toConstr, cast)
 import Control.Monad.Trans.Maybe (MaybeT)
@@ -47,10 +47,14 @@ mkMM :: (Monad m, Typeable m, Data a)
 -- is the same as GenericQ (GenericM (MaybeT m))
 mkMM f x y =
     case (cast x, cast y) of
-        (Just (x' :: a), Just (y' :: a)) -> case cast (f x' y') of
-                Just (res :: m c)           -> res
-                _                           -> mzero
+        (Just (x' :: a), Just (y' :: a)) -> lift $ go f x' y'
         _                                -> mzero
+  where
+    go :: (Monad m, Typeable m, Data a, Data c) => (a -> a -> m a) -> a -> a -> m c
+    go f x y = case cast (f x y) of
+        Just res    -> res
+        Nothing     -> error "Should not be here"
+
 
 ------------------------------------------------------------------------
 -- Example: 

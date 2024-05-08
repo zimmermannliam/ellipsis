@@ -144,7 +144,7 @@ traceWith f t = t
 -- traceWith f t = trace (f t) t
 
 elliToComp :: Env -> Expr -> Expr
-elliToComp e (Ellipsis t1 t2) = traceWith (pp) $ ElliComp t rs
+elliToComp e (Ellipsis t1 t2) = traceWith pp $ ElliComp t rs
     where
     (pre_rs, pre_t) = extractStates e
     (t,(rs',_)) = runState (elliToComp' t1 t2) (pre_rs, pre_t)
@@ -162,8 +162,8 @@ extractStates e = let
                 -> EllipRange {
                     ident=identifier, 
                     var=vname, 
-                    ib=IPlace it_ic, 
-                    ie=IPlace it_ie, 
+                    ib=Value (Con it_ic), 
+                    ie=Value (Con it_ie), 
                     contentT=if content == Indices then BeIndices else BeList
                 })
     nextI = 1 + foldr (max . ident) (-1) rs
@@ -345,14 +345,12 @@ replaceVar' n valin (Var n')  = if n == n' then Value valin else Var n'
 replaceVar' _ _ t           = t
 
 idxToInt :: Env -> Idx -> Int
-idxToInt e (IPlace i)   = i
-idxToInt e (End n)      = valEvalInt $ eval e (Var n)
-idxToInt e (EPlace t)   = valEvalInt $ eval e t
+idxToInt e (Value (Con i))   = i
+idxToInt e (Var n)      = valEvalInt $ eval e (Var n)
+idxToInt e (t)   = valEvalInt $ eval e t
 
 idxToExpr :: Idx -> Expr
-idxToExpr (EPlace t) = t
-idxToExpr (IPlace i) = Value $ Con i
-idxToExpr (End n)    = Var n
+idxToExpr (t) = t
 
 findListFutureElement :: Env -> Bindee -> Idx -> Val
 findListFutureElement e (ListFuture n) i = findNthElement
@@ -366,10 +364,7 @@ findListFutureElement e (ListFuture n) i = findNthElement
                 | otherwise = error $ "ListElement: bad i: " ++ show i
             findNthElement Empty i          = error $ "ListElement: not long enough! i: " ++ show i
             findNthElement x _              = error ("ListElement: non-list element detected:" ++ show x)
-            intIdx = case i of
-                EPlace t    ->  valEvalInt $ eval e t
-                IPlace i    ->  i
-                End n       ->  valEvalInt $ eval e (Var n)
+            intIdx                          = valEvalInt $ eval e i
 
 findListFutureElement e _ _ = errorOut e "Bad list future element search"
 
@@ -410,7 +405,7 @@ patternMatch e t (PVar n, t2)             = Just $ eval (Map.insert (NamedVar n)
 patternMatch e t (PEllipsis n i, t2)      = let
     list = eval e t
     n_idx = case i of
-        (End n) -> n
+        (Var n) -> n
         _       -> error "Tried to unpack a bad ending idx for ellipsis pattern"
     n_t = case eval Map.empty t of
         (FreeVar n) -> n

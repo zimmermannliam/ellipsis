@@ -1,12 +1,13 @@
 module Main where
 
-import Test.HUnit
-
 import qualified EllipLang.Examples as Ex
 import EllipLang.Translator
 import EllipLang.Eval (eval)
 import EllipLang.Syntax
-import EllipLang.SmartCons (vcons)
+import EllipLang.SmartCons (vcons, vPairVCons, listToVCons)
+
+import Test.HUnit
+import Data.List (inits)
 
 prelude = Ex.prelude
 
@@ -33,10 +34,16 @@ testIsCore = map ("isCore" ~:)
     , isCore Ex.fold' ~?= False
     ]
 
+pairAdj :: [a] -> [(a, a)]
+pairAdj xs = zip xs (drop 1 xs)
+
 testTranslate = 
     map 
-        (\(actual, expected) -> "translate" ~: eval prelude (translate actual) 
+        (\(label, actual, expected) -> "translate" ~: label ~: eval prelude (translate actual) 
             ~?= expected)
-        [ (Ex.map' `App` Ex.succ' `App` Ex.exList, vcons $ map succ Ex.exList')
-        , (Ex.map' `App` Ex.succ' `App` Ex.exList2, vcons $ map succ Ex.exList2')
+        [ ("map succ exList", Ex.map' `App` Ex.succ' `App` Ex.exList, vcons $ map succ Ex.exList')
+        , ("map succ exList2", Ex.map' `App` Ex.succ' `App` Ex.exList2, vcons $ map succ Ex.exList2')
+        , ("pairAdj exList2", Ex.pairAdj `App` Ex.exList2, vPairVCons $ pairAdj Ex.exList2')
+        , ("zip exList1 exList2", Ex.zip' `App` Ex.exList `App` Ex.exList2, vPairVCons $ zip Ex.exList' Ex.exList2')
+        , ("inits exList", Ex.inits' `App` Ex.exList, listToVCons $ map vcons $ filter ([] /=) $ inits Ex.exList')
         ]
