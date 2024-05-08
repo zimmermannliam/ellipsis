@@ -24,4 +24,81 @@ x1 ... x ... x ... xn --> x1 ... x ... xn
 fac:
 n -> n * (n-1) * ... * 2 * 1
 
+++ l r:
+x1 x2 .. xn, y1 y2 .. ym -> x1 x2 .. xn y1 y2 .. ym
 
+map f l:
+x1 x2 .. xn -> f x1 f x2 .. f xn
+
+reverse l :
+x1 x2 .. x{n-1} xn -> xn x{n-1} .. x2 x1
+
+fold g z l :
+x1 x2 .. xn = z `g` x1 `g` x2 `g` .. `g` xn
+
+zip l r:
+x1 x2 .. xn y1 y2 .. ym -> (x1,y1) (x2,y2) .. (xn,ym)
+
+zipWith f l r:
+x1 x2 .. xn y1 y2 .. ym -> x1 `f` y1, x2 `f` y2, .. xn `f` ym
+
+take k l :
+x1 x2 .. xk .. xn -> x1 x2 .. xk
+
+drop k l:
+x1 x2 .. xk x{k+1} .. xn -> x{k+1} .. xn
+
+splitAt k l:
+x1 x2 .. xk x{k+1} .. xn -> (x1 x2 xk, x{k+1} .. xn)
+
+takeWhile p l:
+x1 x2 .. xn -> x1 .. xk s.t (p xi) == true
+
+dropWhile p l:
+x1 x2 .. xn -> xi .. xk s.t xi is the first element sucht at (p x)i == false
+
+groupBy p l:
+x1 x2 .. xn -> x1..xk, xk..xj ... ,xi ..xn
+
+Compositions
+
+mapR = map f . reverse l:
+x1 x2 .. xn -> f xn f x{n-1} .. f x2 f x1
+
+foldm = fold g z . map f :
+x1 x2 .. xn -> z `g` f x1 `g` f x2 .. `g` f xn
+
+foldz = fold g z . zip l :
+x1 x2 .. xn y1 y2 .. ym -> z `g` (x1,y1) `g` (x2,y2) .. `g` (xn,yn)
+
+Explaining new functions
+
+dotProduct x y:
+x1 x2 .. xn y1 y2 .. yn -> x1*y1 + x2*y2+ .. + xn*yn
+        = foldl (+) 0 . zipWith (*) x
+x1 x2 .. xn y1 y2 .. yn -> 0 + x1*y1 + x2*y2+ .. + xn*yn
+
+concatMap f l :
+x1 x2 .. xn -> y1 y2 .. yn
+concatMap f = foldl (++) [] . map f = foldl (\x y -> x++y) [] . map f
+x1 x2 .. xn -> [] ++ (f x1) ++ (f x2) ++ .. ++ (f xn)
+
+intersperse c l :
+x1 x2 .. xn -> x1 c x2 c .. c xn
+intersperse c (x:xs) = x : concatMap (\x -> [c,x]) xs
+                     = x : (foldl (++) [] . map (\x -> [c,x])) xs
+x1 x2 .. xn -> x1 [] ++ [c,x2] ++ [c,x3] .. [c,xn]
+
+all p l :
+x1 x2 .. xn -> T/F
+all p = foldm (&&) True p
+x1 x2 .. xn -> True && (p x1) && (p x2) && .. && (p xn)
+
+and l :
+x1 x2 .. xn -> x1 && x2 && .. && xn
+and = foldl (&&) True
+
+any p:
+x1 x2 .. xn -> T/F
+any p = foldm (||) False p
+x1 x2 .. xn -> False || (p x1) || (p x2) || .. || (p xn)
