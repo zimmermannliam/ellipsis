@@ -102,6 +102,17 @@ infixr 0 ==>
 (Var v1, _) <..> (Var v2, Var n)    | v1 /= v2  = error "bad smart constructor"
                                     | otherwise = PEllipsis v1 (Var n)
 
+(<:>) :: Expr -> Expr -> Expr
+l <:> r = Cons l r
+infixr 9 <:>
+
+(<++>) :: Expr -> Expr -> Expr
+l <++> r = Var "(++)" `App` l `App` r
+
+empt :: Expr
+empt = Value Empty
+
+
 if' :: Expr -> Expr -> String -> Expr -> Expr
 if' pred termTrue _ termFalse = Case pred [(PVal $ Boolean True, termTrue), (PVal $ Boolean False, termFalse)]
 
