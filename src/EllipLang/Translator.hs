@@ -2,7 +2,7 @@
 {-# HLINT ignore "Use <$>" #-}
 {-# HLINT ignore "Eta reduce" #-}
 {-# HLINT ignore "Use all" #-}
-module EllipLang.Translator (translate, translate', isCore, elliTransform) where
+module EllipLang.Translator (translate, translate', isCore, tElli) where
 
 import EllipLang.Syntax
 import EllipLang.Pretty (pp, makeElliAlias)
@@ -40,32 +40,32 @@ subscriptFun = Var "(!!)"
 
 -- | Translate Elli-Haskell into Mini-Haskell, check result.
 translate :: Expr -> Expr
-translate t = let translated = unElli t
+translate t = let translated = tExpr t
     in if not (isCore translated)
        then error "Translate did not produce core Mini-Haskell"
        else translated
 
 -- | Translate Elli-Haskell into Mini-Haskell, check result, but do not error.
 translate' :: Expr -> Expr
-translate' t = let translated = unElli t
+translate' t = let translated = tExpr t
     in if not (isCore translated) 
        then trace "WARNING: Translate did not produce core!" translated
        else translated
 
 -- | Remove all ElliHaskell expressions.
-unElli :: Expr -> Expr
-unElli = everywhereUntil (False `mkQ` endTraversal) (mkT unElli' )
+tExpr :: Expr -> Expr
+tExpr = everywhereUntil (False `mkQ` endTraversal) (mkT tExpr' )
   where
-    unElli' :: Expr -> Expr
-    unElli' (Ellipsis b e)      = elliTransform b e
-    unElli' (ElliFold b e f)    = Var "foldr1" `App` f `App` elliTransform b e
-    unElli' (ListElement n idx) = subscriptFun 
+    tExpr' :: Expr -> Expr
+    tExpr' (Ellipsis b e)      = tElli b e
+    tExpr' (ElliFold b e f)    = Var "foldr1" `App` f `App` tElli b e
+    tExpr' (ListElement n idx) = subscriptFun 
         `App` Var n 
         `App` (idx `Sub` inte 1)
-    unElli' (Case target alts) =
-        let alts' = map unElliAlt alts
+    tExpr' (Case target alts) =
+        let alts' = map tAlt alts
         in Case target alts'
-    unElli' t = t
+    tExpr' t = t
 
     endTraversal :: Expr -> Bool
     endTraversal (Ellipsis _ _) = True
@@ -73,14 +73,14 @@ unElli = everywhereUntil (False `mkQ` endTraversal) (mkT unElli' )
     endTraversal _              = False
 
 -- | Takes an elli-haskell alt and turns it into a non-elli-haskell alt.
-unElliAlt :: (Pattern, Expr) -> (Pattern, Expr)
-unElliAlt (PEllipsis listAlias len, t) = 
+tAlt :: (Pattern, Expr) -> (Pattern, Expr)
+tAlt (PEllipsis listAlias len, t) = 
     let lenLet = case idxToName len of
             Just n  -> Let n (App lengthFun (Var listAlias))
             Nothing -> id
-        t' = lenLet (unElli t)
+        t' = lenLet (tExpr t)
     in (PVar listAlias, t')
-unElliAlt alt = alt
+tAlt alt = alt
 
 
 ------------------------------------------------------------------------
@@ -92,9 +92,9 @@ unElliAlt alt = alt
 type ElliState = (Id, [ElliRange])
 
 -- | Evaluate and unwrap elliTransform'.
-elliTransform :: Expr -> Expr -> Expr
-elliTransform begin end =
-    case evalState (runMaybeT (elliTransform' begin end)) (0, []) of
+tElli :: Expr -> Expr -> Expr
+tElli begin end =
+    case evalState (runMaybeT (tElli' begin end)) (0, []) of
         Just r  -> r
         Nothing -> error "Could not transform ellipsis: Mismatched structures."
 
@@ -102,13 +102,13 @@ elliTransform begin end =
 -- (Example is for three lists)
 -- f(x[ix], y[iy], z[iz]) ... f(x[kx], y[ky], z[kz])
 -- zipWith3 (\_x _y _z -> f(_x, _y, _z)) (range x ix kx) (range y iy ky) (range z iz kz)
-elliTransform' :: Expr -> Expr -> MaybeT (State ElliState) Expr
-elliTransform' b e = do
-    transformedTree <- gzipM (mkMMMaybeT elliTransformCollect) b e
-    makeZipWith transformedTree
+tElli' :: Expr -> Expr -> MaybeT (State ElliState) Expr
+tElli' b e = do
+    transformedTree <- gzipM (mkMMMaybeT tElliInner') b e
+    tElliOuter transformedTree
 
-makeZipWith :: Expr -> MaybeT (State ElliState) Expr
-makeZipWith transformedTree = do
+tElliOuter :: Expr -> MaybeT (State ElliState) Expr
+tElliOuter transformedTree = do
     (_, collectedRanges) <- lift get
     let mappedFn = foldr ((<.>) . Var . makeElliAlias) transformedTree collectedRanges
     let nZipWith = length collectedRanges
@@ -122,14 +122,14 @@ makeZipWith transformedTree = do
     makeRange ElliRange {ed_t=ElliList n, ed_ib=ib, ed_ie=ie} = Var "listRange" `App` Var n `App` ib `App` ie
     makeRange ElliRange {ed_t=ElliCounter, ed_ib=ib, ed_ie=ie} = Var "range" `App` ib `App` ie
 
-elliTransformNoZip :: Expr -> Expr -> MaybeT (State ElliState) Expr 
-elliTransformNoZip b e = gzipM (mkMMMaybeT elliTransformCollect) b e
+tElliInner :: Expr -> Expr -> MaybeT (State ElliState) Expr
+tElliInner b e = gzipM (mkMMMaybeT tElliInner') b e
 
 -- | Used generically to run over every expression
-elliTransformCollect :: Expr -> Expr -> MaybeT (State ElliState) Expr
+tElliInner' :: Expr -> Expr -> MaybeT (State ElliState) Expr
 -- xi...xk ==> collect (id, x, i, k) and output _x<id> as a variable
-elliTransformCollect (ListElement nl idxl) (ListElement nr idxr)
-    | nl /= nr      = error "ListElements are different"
+tElliInner' (ListElement nl idxl) (ListElement nr idxr)
+    | nl /= nr      = error "ListElements refer to different lists"
     | otherwise = do
         (id, rs) <- lift get
         let er = ElliRange { ed_id=id
@@ -142,24 +142,24 @@ elliTransformCollect (ListElement nl idxl) (ListElement nr idxr)
 -- (xi ... xk) ... (xj ... xn)
 -- ==> (id, x, i k) ... (id2, x, j, n)
 -- ==> (id, x, a, b) where a= i..j, b=k..n  
-elliTransformCollect (Ellipsis ll lr) (Ellipsis rl rr) = do
+tElliInner' (Ellipsis ll lr) (Ellipsis rl rr) = do
     s@(id,rs) <- lift get
     -- These computations are contained and do not affect state, other than
     -- increasing the id for the purpose of disambiguation.
-    let (l, (idl, _)) = runState (runMaybeT $ elliTransform' ll lr) s
-    let (r, (idr, _)) = runState (runMaybeT $ elliTransform' rl rr) s
+    let (l, (idl, _)) = runState (runMaybeT $ tElli' ll lr) s
+    let (r, (idr, _)) = runState (runMaybeT $ tElli' rl rr) s
     case (l, r) of
         (Just l', Just r') -> do
             lift $ put (id+idl,rs)
-            gzipM (mkMMMaybeT elliTransformCollect) l' r'
+            gzipM (mkMMMaybeT tElliInner') l' r'
         _ -> mzero
 -- Just stop computation here, otherwise we can accidentally pollute state
-elliTransformCollect (ER l) (ER r) | ed_id l == ed_id r = return $ ER l
+tElliInner' (ER l) (ER r) | ed_id l == ed_id r = return $ ER l
                                    | otherwise          = mzero
 -- Group up expressions, for example:
 -- [k1 + 1] ... [k2 + 5] (which generates k1+1..k2+5)
 -- is different from [k1] + [1] ... [k2] + [5], which generates (k1..k2 and 1..5)
-elliTransformCollect (ElliGroup l) (ElliGroup r) = do
+tElliInner' (ElliGroup l) (ElliGroup r) = do
     (id, rs) <- lift get
     let er = ElliRange { ed_id=id
                        , ed_t=ElliCounter
@@ -170,9 +170,9 @@ elliTransformCollect (ElliGroup l) (ElliGroup r) = do
     return $ Var $ makeElliAlias er
 
 -- [] ... [x1 ... xn]
-elliTransformCollect (Value Empty) (Ellipsis rl rr) = do
+tElliInner' (Value Empty) (Ellipsis rl rr) = do
     s@(id,rs) <- lift get
-    let (r, (idr, nestedrs)) = runState (runMaybeT $ elliTransformNoZip rl rr) s
+    let (r, (idr, nestedrs)) = runState (runMaybeT $ tElliInner rl rr) s
     case r of
         (Just r') -> do
             let er = ElliRange { ed_id=id+idr
@@ -182,15 +182,15 @@ elliTransformCollect (Value Empty) (Ellipsis rl rr) = do
                                }
             let nestedrs' = map (\range -> range {ed_ie=Var $ makeElliAlias er}) nestedrs
             lift $ put (id+idr+1, er:rs)
-            case evalState (runMaybeT $ makeZipWith r') (idr, nestedrs') of
+            case evalState (runMaybeT $ tElliOuter r') (idr, nestedrs') of
                 (Just res) -> return res
                 Nothing     -> mzero
         Nothing -> mzero
 
 -- [x1...xn] ... []
-elliTransformCollect (Ellipsis ll lr) (Value Empty) = do
+tElliInner' (Ellipsis ll lr) (Value Empty) = do
     s@(id,rs) <- lift get
-    let (l, (idl, nestedrs)) = runState (runMaybeT $ elliTransformNoZip ll lr) s
+    let (l, (idl, nestedrs)) = runState (runMaybeT $ tElliInner ll lr) s
     case l of
         (Just l') -> do
             let er = ElliRange { ed_id=id+idl
@@ -200,7 +200,7 @@ elliTransformCollect (Ellipsis ll lr) (Value Empty) = do
                                }
             let nestedrs' = map (\range -> range {ed_ie=Var $ makeElliAlias er}) nestedrs
             lift $ put (id+idl+1, er:rs)
-            case evalState (runMaybeT $ makeZipWith l') (idl, nestedrs') of
+            case evalState (runMaybeT $ tElliOuter l') (idl, nestedrs') of
                 (Just res) -> return res
                 Nothing     -> mzero
         Nothing -> mzero
@@ -208,7 +208,7 @@ elliTransformCollect (Ellipsis ll lr) (Value Empty) = do
 -- [x1] ... [x1...xn]       ==> [x1], [x1, x2], [x1,x2,x3], ...
 -- [x1, x2] ... [x1...xn]   ==> [x1,x2], [x1,x2,x3], ...
 -- and so on
-elliTransformCollect xs@(Cons _ _) (Ellipsis rl rr) = do
+tElliInner' xs@(Cons _ _) (Ellipsis rl rr) = do
     {-
     Using this example:
     zipInits (x1...xn) (y1...ym) =
@@ -219,7 +219,7 @@ elliTransformCollect xs@(Cons _ _) (Ellipsis rl rr) = do
     -- Transform the Ellipsis on the right side.
     -- [(x1, y1) ... (xn, yn)] ==> (_x1, _y0) + (rangeX, rangeY)
     s@(id,rngs) <- lift get
-    let (r, (idr, nestedrngs)) = runState (runMaybeT $ elliTransformNoZip rl rr) s
+    let (r, (idr, nestedrngs)) = runState (runMaybeT $ tElliInner rl rr) s
     lift $ put (id+idr, rngs) -- Increase ID so we don't step on feet later
     r' <- hoistMaybe r
 
@@ -257,7 +257,7 @@ elliTransformCollect xs@(Cons _ _) (Ellipsis rl rr) = do
     lift $ put (id'+length newrngs, newrngs ++ rngs')
 
     -- return zipped
-    hoistMaybe $ evalState (runMaybeT $ makeZipWith r') (length nestedrngs', nestedrngs')
+    hoistMaybe $ evalState (runMaybeT $ tElliOuter r') (length nestedrngs', nestedrngs')
   where
     makeOuterNewNestedPair :: Int -> Int -> (Expr, ElliRange) -> (ElliRange, ElliRange)
     makeOuterNewNestedPair id i (idx, rng) =
@@ -305,7 +305,7 @@ elliTransformCollect xs@(Cons _ _) (Ellipsis rl rr) = do
 
 -- Catch-all: if you can take both sides and turn it into a simple counter,
 -- then do that. Otherwise, keep iterating in.
-elliTransformCollect l r 
+tElliInner' l r 
     | not (isElliAble l && isElliAble r) = mzero -- Continue
     | l == r    = mzero
     | otherwise = do
