@@ -1,123 +1,227 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use <$>" #-}
+{-# LANGUAGE OverloadedStrings #-}
 module EllipLang.Parser where
 
 import EllipLang.Syntax
-import Data.Void (Void)
+import Data.Text (Text)
+import Data.Void
 import Text.Megaparsec
 import Text.Megaparsec.Char
+import Control.Monad (void)
 import qualified Text.Megaparsec.Char.Lexer as L
+import qualified Data.Text as T
+import Control.Monad.Combinators.Expr
+import Text.Megaparsec.Debug (dbg)
 import Debug.Trace
-import qualified Data.Map as Map
-import qualified Control.Monad.Combinators.Expr as Pexpr
-import Data.String.Utils (replace)
 
-type Parser = Parsec Void String
+type Parser = Parsec Void Text
 
-parseString :: String -> Expr
-parseString s =  case parse expr "input" <$> [s] of
-    [Right ex]    -> ex
-    [Left other]  -> error (errorBundlePretty other)
-    other         -> error (show other)
-
-
-testParser :: IO ()
-testParser = foldr ((<>) . 
-    (\(str,expected) -> let parsed = (parse expr "input" <$> [str])
-        in putStrLn $ str ++ ": " ++ (
-            case (parsed,expected) of
-                ([Right tParsed], Just tExpected) -> 
-                    if tParsed == tExpected then "OK"
-                    else "ERROR: expected: " ++ show tExpected ++ " but got: " ++ show tParsed
-                ([Left errParsed], Nothing) -> 
-                    "OK (" ++ replace "\n" " " (errorBundlePretty errParsed) ++ ")"
-                ([Left errParsed], Just tExpected) -> 
-                    "ERROR: expected: " ++ show tExpected ++ " but got: " ++ replace "\n" " " (errorBundlePretty errParsed)
-                ([Right tParsed], Nothing) -> "ERROR: expected error but got: " ++ show tParsed
-        )
-    )) (return ()) testStrings
-
-
-testStrings :: [(String, Maybe Expr)]
-testStrings = [
-    ("\\x.x 5", Just $ App (Abstr "x" (Var "x")) (Value (Con 5))),
-    ("(\\x.x) 5", Just $ App (Abstr "x" (Var "x")) (Value (Con 5))),
-    ("(\\x.(x+1)) 5", Just $ 
-        Abstr "x" (Var "x" `Add` Value (Con 1)) `App` Value (Con 5)),
-    ("\\x.(x+1) 5", Just $ 
-        Abstr "x" (Var "x" `Add` Value (Con 1)) `App` Value (Con 5)),
-    ("() 5", Nothing)
+resw =
+    [ "if", "then", "else"
+    , "\\", "->"
+    , "case", "of"
+    , "..."
     ]
 
+pExpr :: Parser Expr
+pExpr = makeExprParser pTerm operatorTable
 
-expr :: Parser Expr
-expr = choice
-    [
-        try app
-    ,   abstr
-    ,   try infx
-    ,   atom
+------------------------------------------------------------------------
+--
+-- Terms
+--
+------------------------------------------------------------------------
+
+pTerm :: Parser Expr
+pTerm = choice
+    [ parens pExpr
+    , pAbstr
+    , pIfThenElse
+    , pCase
+    , pBool
+    , pInt
+    , try pListElement
+    , pVar
     ]
 
-infx :: Parser Expr
-infx = do
-    lhs <- atom
-    _ <- many space1
-    sym <- choice $ map string (Map.keys infxOps)
-    _ <- many space1
-    rhs <- atom
-    return $ (infxOps Map.! sym) lhs rhs
+parens :: Parser a -> Parser a
+parens = between (symbol "(") (symbol ")")
+
+curlyBraces :: Parser a -> Parser a
+curlyBraces = between (symbol "{") (symbol "}")
+
+squareBrackets :: Parser a -> Parser a
+squareBrackets = between (symbol "[") (symbol "]")
+
+pAbstr :: Parser Expr
+pAbstr = do
+    void (char '\\')
+    names <- some $ lexeme pIdent
+    void $ lexeme (string "->")
+    e <- pExpr
+    return $ foldr Abstr e names
+
+pIfThenElse :: Parser Expr
+pIfThenElse = do
+    void $ lexeme (string "if")
+    pred <- pExpr
+    void $ lexeme (string "then")
+    trueCase <- pExpr
+    void $ lexeme (string "else")
+    falseCase <- pExpr
+    return $ Case pred [(PVal $ Boolean True, trueCase), (PVal $ Boolean False, falseCase)]
+
+pCase :: Parser Expr
+pCase = do
+    void $ lexeme (string "case")
+    target <- pExpr
+    void $ lexeme (string "of")
+    alts <- curlyBraces pAlts
+    return $ Case target alts
+  where
+    pAlts :: Parser Alts 
+    pAlts = many $ pAlt <* lexeme (char ';')
+
+    pAlt :: Parser (Pattern, Expr)
+    pAlt = do
+        pat <- pPattern
+        void $ lexeme (string "->")
+        expr <- pExpr
+        return (pat, expr)
+    
+    pPattern :: Parser Pattern
+    pPattern = choice
+        [ squareBrackets $ do -- PElli
+            begin <- pListElement
+            void $ lexeme $ optional $ char ','
+            void $ lexeme $ string "..."
+            void $ lexeme $ optional $ char ','
+            end <- pListElement
+            var <- listElementVar begin end
+            (_, idxr) <- listElementIdx begin end
+            return $ PEllipsis var idxr
+        , do -- PVal
+            val <- pVal
+            return $ PVal val
+        , do -- PVar
+            ident <- pIdent
+            return $ PVar ident
+        ]
+    pVal :: Parser Val
+    pVal = (lexeme . try) (pTerm >>= check)
+      where
+        check (Value v) = return v
+        check t = fail $ show t ++ " is not a value"
+
+    listElementVar :: Expr -> Expr -> Parser String
+    listElementVar (ListElement nl _) (ListElement nr _)
+        | nl == nr = return nl
+        | otherwise = fail "ListElements had different names in pattern"
+    listElementVar _  _              = fail "Tried to get list element vars from non-list element"
+
+    listElementIdx :: Expr -> Expr -> Parser (Expr, Expr)
+    listElementIdx (ListElement nl idxl) (ListElement nr idxr) = return (idxl, idxr)
+    listElementIdx _ _ = fail $ "tried to get list element vars from non-listelements"
+
+pBool :: Parser Expr
+pBool = lexeme ((Value (Boolean True)  <$ string "True")
+                <|> (Value (Boolean False) <$ string "False"))
+        <?> "boolean"
+
+pInt :: Parser Expr
+pInt = Value . Con <$> integer
     where
-        arithOps    = [("+", Add), ("-", Sub), ("*", Mul), ("/", Div)]
-        boolOps     = [("&&", And), ("||", Or)]
-        relOps      = [("==", Eq), ("<", Lt), (">", Gt), ("<=", Leq), (">=", Geq), ("!=", Neq)]
-        infxOps = Map.fromList (arithOps ++ boolOps ++ relOps)
+    integer :: Parser Int
+    integer = lexeme L.decimal
+
+pVar :: Parser Expr
+pVar = Var <$> pIdent
+
+pIdent' :: Parser Text
+pIdent' = T.pack <$> pIdent
+
+pIdent :: Parser String
+pIdent = (lexeme . try) (ident >>= check)
+  where
+    -- https://github.com/mrkkrp/megaparsec-site/blob/master/tutorials/parsing-simple-imperative-language.md
+    ident = ((:) <$> letterChar <*> many alphaNumChar) <?> "variable"
+    check x = 
+        if x `elem` resw
+        then fail $ show x ++ " is a keyword"
+        else return x
+
+
+pListElement :: Parser Expr
+pListElement = do
+    ident <- pIdent
+    term <- curlyBraces pExpr
+    return $ ListElement ident term
 
 
 
-atom :: Parser Expr
-atom = choice
-    [
-        paren
-    ,   int
-    ,   bool
-    ,   variable
+------------------------------------------------------------------------
+--
+-- Operators
+--
+------------------------------------------------------------------------
+
+operatorTable :: [[Operator Parser Expr]]
+operatorTable =
+    [ [ InfixL ifx
+      , app
+      ] -- 9
+    , [] -- 8
+    , [ binary "*" Mul
+      , binary "`div`" Div
+      , binary "`mod`" Mod
+      ] -- 7
+    , [ binary "-" Sub
+      , binary "+" Add
+      ] -- 6
+    , [ binary ":" Cons
+      ] -- 5
+    , [ binary "==" Eq
+      , binary "/=" Neq
+      , binary "<" Lt
+      , binary "<=" Leq
+      , binary ">" Gt
+      , binary ">=" Geq
+      ] -- 4
+    , [ binary "&&" And
+      ] -- 3
+    , [ binary "||" Or
+      ] -- 2
+    , [] -- 1
+    , [] -- 0
     ]
+  where
+    binary :: Text -> (Expr -> Expr -> Expr) -> Operator Parser Expr
+    binary name f = InfixL (f <$ symbol name)
 
-variable :: Parser Expr
-variable = lexeme $ Var <$> variable'
+    ifx :: Parser (Expr -> Expr -> Expr)
+    ifx = do
+        f <- lexeme $ between (char '`') (char '`') (T.unpack <$> pIdent')
+        return (\l r -> Var f `App` l `App` r)
 
-variable' :: Parser String
-variable' = lexeme $ do
-    first <- letterChar <|> char '_'
-    rest <- many (alphaNumChar <|> char '_')
-    return $ first:rest
+app :: Operator Parser Expr
+app = InfixL (App <$ (symbol "" <?> "application"))
 
-int :: Parser Expr
-int = Value . Con <$> lexeme (read <$> some numberChar)
 
-bool :: Parser Expr
-bool = Value . Boolean <$> lexeme (False <$ string "false" <|> True <$ string "true")
-
-abstr :: Parser Expr
-abstr = Abstr
-    <$> between (char '\\') (char '.') variable'
-    <*> expr
-
-app :: Parser Expr
-app = do
-    lhs <- try abstr 
-    _ <- many space1
-    App lhs <$> expr
-
-paren :: Parser Expr
-paren = lexeme $ char '(' *> expr <* char ')'
-
-skipSpace :: Parser ()
-skipSpace = L.space
+------------------------------------------------------------------------
+--
+-- Lexer stuff
+--
+------------------------------------------------------------------------
+sc :: Parser ()
+sc = L.space
     space1
-    (L.skipLineComment "//")
-    (L.skipBlockCommentNested "/*" "*/")
+    (L.skipLineComment "--")
+    (L.skipBlockComment "{-" "-}")
 
 lexeme :: Parser a -> Parser a
-lexeme = L.lexeme skipSpace
+lexeme = L.lexeme sc
+
+symbol :: Text -> Parser Text
+symbol = L.symbol sc
+
