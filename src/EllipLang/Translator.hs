@@ -148,11 +148,28 @@ tElliInner' (Ellipsis ll lr) (Ellipsis rl rr) = do
     -- increasing the id for the purpose of disambiguation.
     let (l, (idl, _)) = runState (runMaybeT $ tElli' ll lr) s
     let (r, (idr, _)) = runState (runMaybeT $ tElli' rl rr) s
-    case (l, r) of
-        (Just l', Just r') -> do
-            lift $ put (id+idl,rs)
-            gzipM (mkMMMaybeT tElliInner') l' r'
-        _ -> mzero
+    l' <- hoistMaybe l
+    r' <- hoistMaybe r
+    guard $ idl == idr  -- Just quickly check the state
+    lift $ put (id+idl,rs)
+    gzipM (mkMMMaybeT tElliInner') l' r'
+
+tElliInner' (ElliFold ll lr opl) (ElliFold rl rr opr)
+    | opl /= opr = mzero
+    | otherwise  = do
+        s@(id,rs) <- lift get
+        -- These computations are contained and do not affect state, other than
+        -- increasing the id for the purpose of disambiguation.
+        let (l, (idl, _)) = runState (runMaybeT $ tElli' ll lr) s
+        let (r, (idr, _)) = runState (runMaybeT $ tElli' rl rr) s
+        l' <- hoistMaybe l
+        r' <- hoistMaybe r
+        guard $ idl == idr  -- Just quickly check the state
+        lift $ put (id+idl,rs)
+        res <- gzipM (mkMMMaybeT tElliInner') l' r'
+        return $ Var "foldr1" `App` opl `App` res
+        
+
 -- Just stop computation here, otherwise we can accidentally pollute state
 tElliInner' (ER l) (ER r) | ed_id l == ed_id r = return $ ER l
                                    | otherwise          = mzero
@@ -173,19 +190,17 @@ tElliInner' (ElliGroup l) (ElliGroup r) = do
 tElliInner' (Value Empty) (Ellipsis rl rr) = do
     s@(id,rs) <- lift get
     let (r, (idr, nestedrs)) = runState (runMaybeT $ tElliInner rl rr) s
-    case r of
-        (Just r') -> do
-            let er = ElliRange { ed_id=id+idr
-                               , ed_t=ElliCounter
-                               , ed_ib=inte 0
-                               , ed_ie=Var "foldr1" `App` Var "max" `App` listToCons (map ed_ie nestedrs)
-                               }
-            let nestedrs' = map (\range -> range {ed_ie=Var $ makeElliAlias er}) nestedrs
-            lift $ put (id+idr+1, er:rs)
-            case evalState (runMaybeT $ tElliOuter r') (idr, nestedrs') of
-                (Just res) -> return res
-                Nothing     -> mzero
-        Nothing -> mzero
+    r' <- hoistMaybe r
+    let er = ElliRange { ed_id=id+idr
+                        , ed_t=ElliCounter
+                        , ed_ib=inte 0
+                        , ed_ie=Var "foldr1" `App` Var "max" `App` listToCons (map ed_ie nestedrs)
+                        }
+    let nestedrs' = map (\range -> range {ed_ie=Var $ makeElliAlias er}) nestedrs
+    lift $ put (id+idr+1, er:rs)
+    case evalState (runMaybeT $ tElliOuter r') (idr, nestedrs') of
+        (Just res) -> return res
+        Nothing     -> mzero
 
 -- [x1...xn] ... []
 tElliInner' (Ellipsis ll lr) (Value Empty) = do
