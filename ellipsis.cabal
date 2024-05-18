@@ -60,16 +60,17 @@ common shared
                         parsec,
                         MissingH,
                         transformers,
-                        extra
+                        extra,
+                        text
     other-extensions: 
     other-modules:      GenericHelper
 
 library EllipLang
     import: shared
     exposed-modules:
+        EllipLang.Parser
         EllipLang.Examples
         EllipLang.Translator
-        EllipLang.Parser
         EllipLang.Pretty
         EllipLang.Eval
         EllipLang.Syntax
