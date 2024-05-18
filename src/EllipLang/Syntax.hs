@@ -43,6 +43,7 @@ data Expr = Var Name                -- Variable
           | Infix Expr Expr Expr
           | ER ElliRange
           | ElliGroup Expr
+          | PreElli
           deriving (Eq, Show, Data, Typeable)
 {-
 infix 8 `Pair`

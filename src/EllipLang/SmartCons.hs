@@ -5,7 +5,7 @@ import Data.Function ((&))
 
 import EllipLang.Syntax
 
-[f,x,n,l,r,m,k,t,y,z,k',xs,ys,zs,list,term,g,a,b,list1,list2,l1,l2,begin,end] = map Var ["f","x","n","l","r","m","k","t","y","z","k'","xs","ys","zs","list","term","g","a","b","list1","list2","l1","l2","begin","end"]
+[f,x,n,l,r,m,k,t,y,z,k',xs,ys,zs,list,term,g,a,b,list1,list2,l1,l2,begin,end,fn] = map Var ["f","x","n","l","r","m","k","t","y","z","k'","xs","ys","zs","list","term","g","a","b","list1","list2","l1","l2","begin","end","fn"]
 [x0,x1,x2] = map EllipVar [0,1,2]
 
 true = Value $ Boolean True
@@ -18,7 +18,8 @@ icons :: [Int] -> Expr
 icons l = foldr1 Cons (map con l ++ [Value Empty])
 
 cons :: [Expr] -> Expr
-cons = foldr Cons (Value Empty)
+cons [Ellipsis l r] = Ellipsis l r
+cons t = foldr Cons (Value Empty) t
 
 vcons :: [Int] -> Val
 vcons = foldr (VCons . Con) Empty
