@@ -10,7 +10,7 @@ map f [x1,...,xn] = [f x1,...,f xn]
 -- | zip takes two lists and returns a list of corresponding pairs.
 zip [x1,...,xn] [y1,...,ym] = [(x1, y1),...,(xn, ym)]
 -- or
-zip [x1,...,xn] [y1,...,ym] =
+zip' [x1,...,xn] [y1,...,ym] =
     let k = min n m
     in [(x1, y1),...,(xk, yk)]
 
@@ -44,9 +44,9 @@ drop k [x1,...,xn] = [xk, ..., xn]
 -- | inits returns all initial segments of the argument, shortest first.
 inits [x1,...,xn] = [[], [x1], [x1,x2], ..., [x1,x2,...,xn]]
 -- or
-inits [x1,...,xn] = [[], [x1], ..., [x1,...,xn]]
+inits' [x1,...,xn] = [[], [x1], ..., [x1,...,xn]]
 -- or
-inits [x1,...,xn] = [[], ..., [x1,...,xn]]
+inits'' [x1,...,xn] = [[], ..., [x1,...,xn]]
 
 -- | scanl1 is similar to foldl1, but returns a list of successive values
 -- reduced from the left.

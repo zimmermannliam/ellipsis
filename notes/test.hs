@@ -199,7 +199,6 @@ iNodeI :: Tree -> Maybe Int
 iNodeI (INode i)    = Just i
 iNodeI _            = Nothing
 
--}
 
 data Tree = Branch Tree Tree | Leaf Int
     deriving (Data, Show)
@@ -219,3 +218,27 @@ gCollectSum x y = gCollectSum' x y
     where
     gCollectSum :: GenericQ (GenericQ Int)
     gCollectSum x y = 
+-}
+    
+
+range begin end =
+    if begin == end     then [begin]
+    else if begin < end then begin:(range (begin+1) end)
+    else                     begin:(range (begin-1) end)
+
+listRange xs begin end =
+    if begin < 1                then []
+    else if begin > length xs   then []
+    else if end < 1             then []
+    else if begin <= end        then drop (begin-1) (take end xs)
+    else
+        let begin' = (length xs) - begin + 1 in
+        let end'   = (length xs) - end + 1
+        in drop (begin' - 1) (take end' (reverse xs))
+
+myfoldr1 fn list =
+    let foldr1' = (\f list1 -> case list1 of
+        { [x]     -> x
+        ; (x:xs)  -> f x (foldr1' f xs)
+        ; []      -> error "foldr1: Empty list"})
+    in foldr1' fn list
