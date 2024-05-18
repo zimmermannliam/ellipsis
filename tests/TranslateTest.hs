@@ -46,4 +46,6 @@ testTranslate =
         , ("pairAdj exList2", Ex.pairAdj `App` Ex.exList2, vPairVCons $ pairAdj Ex.exList2')
         , ("zip exList1 exList2", Ex.zip' `App` Ex.exList `App` Ex.exList2, vPairVCons $ zip Ex.exList' Ex.exList2')
         , ("inits exList", Ex.inits' `App` Ex.exList, listToVCons $ map vcons $ filter ([] /=) $ inits Ex.exList')
+        , ("inits2 exList", Ex.inits2 `App` Ex.exList, listToVCons $ map vcons $ inits Ex.exList')
+        , ("inits3 exList", Ex.inits3 `App` Ex.exList, listToVCons $ map vcons $ inits Ex.exList')
         ]
