@@ -36,7 +36,7 @@ data Expr = Var Name                -- Variable
           | Abs Expr
           | Btwn Expr Expr
           | Ellipsis Expr Expr
-          | ElliFold Expr Expr Expr -- (t1) + ... + (tn) would be ElliFold t1 t2 +
+          | ElliFoldr Expr Expr Expr -- (t1) + ... + (tn) would be ElliFold t1 t2 +
           -- Processing stuff
           | EllipVar Id
           | Index Idx

@@ -58,7 +58,7 @@ tExpr = everywhereUntil (False `mkQ` endTraversal) (mkT tExpr' )
   where
     tExpr' :: Expr -> Expr
     tExpr' (Ellipsis b e)      = tElli b e
-    tExpr' (ElliFold b e f)    = Var "foldr1" `App` f `App` tElli b e
+    tExpr' (ElliFoldr b e f)    = Var "foldr1" `App` f `App` tElli b e
     tExpr' (ListElement n idx) = subscriptFun 
         `App` Var n 
         `App` (idx `Sub` inte 1)
@@ -69,7 +69,7 @@ tExpr = everywhereUntil (False `mkQ` endTraversal) (mkT tExpr' )
 
     endTraversal :: Expr -> Bool
     endTraversal (Ellipsis _ _) = True
-    endTraversal (ElliFold {}) = True
+    endTraversal (ElliFoldr {}) = True
     endTraversal _              = False
 
 -- | Takes an elli-haskell alt and turns it into a non-elli-haskell alt.
@@ -154,7 +154,7 @@ tElliInner' (Ellipsis ll lr) (Ellipsis rl rr) = do
     lift $ put (id+idl,rs)
     gzipM (mkMMMaybeT tElliInner') l' r'
 
-tElliInner' (ElliFold ll lr opl) (ElliFold rl rr opr)
+tElliInner' (ElliFoldr ll lr opl) (ElliFoldr rl rr opr)
     | opl /= opr = mzero
     | otherwise  = do
         s@(id,rs) <- lift get
@@ -346,7 +346,7 @@ isCore = everything (&&) (True `mkQ` isCore')
   where
     isCore' :: Expr -> Bool
     isCore' (Ellipsis _ _)  = False
-    isCore' (ElliFold {} )  = False
+    isCore' (ElliFoldr {} )  = False
     isCore' (ElliComp _ _)  = False
     isCore' (EllipVar _)    = False
     isCore' (ElliGroup _)   = False

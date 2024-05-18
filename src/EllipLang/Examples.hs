@@ -201,7 +201,7 @@ zip3' =
 
 fold' :: Expr
 fold' = f <.> xs <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> ElliFold (x!.1) (x!n) f
+    (x, 1) <..> (x, n)  ==> ElliFoldr (x!.1) (x!n) f
     )
 
 pairAdj :: Expr
@@ -373,7 +373,7 @@ scanl1' = f <.> xs <.> case1 xs (
 sum' :: Expr
 sum' = xs <.> case1 xs (
     (x, 1) <..> (x, n) ==>
-        ElliFold (x!.1) (x!n) (a <.> b <.> a `Add` b)
+        ElliFoldr (x!.1) (x!n) (a <.> b <.> a `Add` b)
     )
 
 ------------------------------------------------------------------------

@@ -301,7 +301,7 @@ operatorTable =
         let f = Abstr "l" $ Abstr "r" (Var "l" `f1` Var "r")
         if toConstr (f1 undefined undefined) /= toConstr (f2 undefined undefined)
         then fail "different operators on elli-fold"
-        else return $ \l r -> ElliFold l r f
+        else return $ \l r -> ElliFoldr l r f
 
 
 app :: Operator Parser Expr

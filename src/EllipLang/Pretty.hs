@@ -66,7 +66,7 @@ pp' tabs ellip@(ElliComp _ _) = ppEllip ellip
 pp' tabs (EllipVar i)         = "EllipVar(" ++ show i ++ ")"
 pp' tabs (Ellipsis t1 t2)  = "[" ++ pp' tabs t1 ++ ",...," ++ pp' tabs t2 ++ "]"
 pp' tabs (Index idx)          = ppIdx idx
-pp' tabs (ElliFold t1 t2 f) 
+pp' tabs (ElliFoldr t1 t2 f) 
     = "(" ++ pp' tabs t1 ++ " `" ++ pp' tabs f ++ "` ... `" ++ pp' tabs f ++ "` " ++ pp' tabs t2 ++ ")"
 pp' tabs (ER r)             = makeElliAlias r
 pp' tabs (Btwn t1 t2) = "[" ++ pp' tabs t1 ++ ".." ++ pp' tabs t2 ++ "]"

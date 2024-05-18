@@ -123,7 +123,7 @@ eval e (Abs t) = case eval e t of
     _                   -> errorOut e "Bad abs term"
 
 eval e (Infix f t1 t2) = eval e (f `App` t1 `App` t2)
-eval e (ElliFold t1 tn f) = 
+eval e (ElliFoldr t1 tn f) = 
     let list = unVCons (eval e (Ellipsis t1 tn))
     in eval e $ foldValToExpr (\a b -> f `App` a `App` b) list
 eval e (Btwn t1 t2) = case (eval e t1, eval e t2) of

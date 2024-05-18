@@ -9,7 +9,8 @@
 
 module GenericHelper where
 
-import Data.Generics (Data, Typeable, GenericT, GenericQ, GenericM, gzipWithM, toConstr, cast, gmapT, gmapQ, gzipWithQ)
+import Data.Generics (Data, Typeable, GenericT, GenericQ, GenericM, gzipWithM, toConstr, cast, gmapT, gmapQ, gzipWithQ
+    , everything, mkQ)
 import Control.Monad.Trans.Maybe
 import Control.Monad (mzero, guard)
 import Control.Monad.Trans (lift)
@@ -50,6 +51,7 @@ mkMMMaybeT f x y =
                 Just (res :: MaybeT m c)    -> res
                 _                           -> mzero
         _                                -> mzero
+
 mkMM :: (Monad m, Typeable m, Data a)
     => (a -> a -> m a)
     -> (forall b. Data b => b -> forall c. Data c => c -> MaybeT m c)
