@@ -38,6 +38,7 @@ prelude' = Map.fromList
     , (NamedVar "zipWith", BVal $ eval Map.empty zipWith')
     , (NamedVar "drop", BVal $ eval Map.empty drop')
     , (NamedVar "take", BVal $ eval Map.empty take')
+    , (NamedVar "foldr1", BVal $ eval Map.empty foldr1')
     ]
 
 prelude = Map.union prelude' $ Map.fromList
@@ -152,6 +153,15 @@ zipWith' =
 succ' :: Expr
 succ' = x <.> x `Add` inte 1
 
+foldr1' :: Expr
+foldr1' = fn <.> list <.> 
+    LetRec "foldr1" (f <.> list1 <.> Case list1 -- of
+    [ (PCons' x empt, x)
+    , (PVal Empty, Error "foldr1: Empty list")
+    , (PCons "x" "xs", f `App` x `App` (Var "foldr1" `App` f `App` xs))
+    ]
+    ) -- in
+    (Var "foldr1" `App` fn `App` list)
 
 ------------------------------------------------------------------------
 -- Example functions
@@ -165,6 +175,11 @@ reverse' = xs <.> case1 xs (
 map' :: Expr
 map' = f <.> xs <.> case1 xs (
     (x, 1) <..> (x, n)  ==> (f `App` (x!.1)) <...> (f `App` (x!n))
+    )
+
+map2 :: Expr
+map2 = f <.> xs <.> case1 xs (
+    (x, 1) <..> (x, n) ==> ((f `App` (x!.1)) <:> empt) <++> (f `App` (x!.2) <...> f `App` (x!n))
     )
 
 zip' :: Expr
@@ -227,10 +242,20 @@ inits2Backwards = Abstr "xs" $ Case xs -- of
 inits3 :: Expr
 inits3 = Abstr "xs" $ Case xs -- of
     [(PEllipsis "x" n,
-        (Cons (ListElement "x" (inte 1)) (Value Empty))
+        (empt <:> empt) <++>
+        (((x!.1) <:> empt)
         <...>
-        ((x!.1) <...> (x!n))
+        ((x!.1) <...> (x!n)))
     )]
+
+inits4 :: Expr
+inits4 = Abstr "xs" $ Case xs -- of
+    [(x, 1) <..> (x, n) ==> 
+        (empt <:> ((x!.1) <:> empt) <:> empt)
+        <++> (((x!.1) <:> (x!.2) <:> empt)
+        <...>
+        (((x!.1) <:> empt) <++> ((x!.2) <...> (x!n))))
+    ]
 
 
 -- zipInits [x1...xn] [y1...ym] = [[(x1, y1)], [(x1, y1), (x2, y2)], ..., [(x1, y1)...(xn,ym)]]
@@ -339,9 +364,16 @@ tryElliGroup2 = xs <.> a <.> b <.> case1 xs (
 scanl1' :: Expr
 scanl1' = f <.> xs <.> case1 xs (
     (x, 1) <..> (x, n) ==>
-        ((Var "foldl1") `App` f `App` ((x!.1) <...> (x!.1)))
-        <...>
-        ((Var "foldl1") `App` f `App` ((x!.1) <...> (x!n)))
+        Var "(++)"
+        `App` Cons (x!.1) (Value Empty)
+        `App` ((Var "foldl1" `App` f `App` (Cons (x!.1) (Cons (x!.2) (Value Empty))))
+        <...> (Var "foldl1" `App` f `App` ((x!.1) <...> (x!n))))
+    )
+
+sum' :: Expr
+sum' = xs <.> case1 xs (
+    (x, 1) <..> (x, n) ==>
+        ElliFold (x!.1) (x!n) (a <.> b <.> a `Add` b)
     )
 
 ------------------------------------------------------------------------
