@@ -2,7 +2,7 @@
 {-# HLINT ignore "Use <$>" #-}
 {-# HLINT ignore "Eta reduce" #-}
 {-# HLINT ignore "Use all" #-}
-module EllipLang.Translator (translate, translate', isCore, tElli) where
+module EllipLang.Translator (translate, translate', isCore, tElliExpr) where
 
 import EllipLang.Syntax
 import EllipLang.Pretty (pp, makeElliAlias)
@@ -57,8 +57,8 @@ tExpr :: Expr -> Expr
 tExpr = everywhereUntil (False `mkQ` endTraversal) (mkT tExpr' )
   where
     tExpr' :: Expr -> Expr
-    tExpr' (Ellipsis b e)      = tElli b e
-    tExpr' (ElliFoldr b e f)    = Var "foldr1" `App` f `App` tElli b e
+    tExpr' (Ellipsis b e)      = tElliExpr b e
+    tExpr' (ElliFoldr b e f)    = Var "foldr1" `App` f `App` tElliExpr b e
     tExpr' (ListElement n idx) = subscriptFun 
         `App` Var n 
         `App` (idx `Sub` inte 1)
@@ -91,10 +91,10 @@ tAlt alt = alt
 
 type ElliState = (Id, [ElliRange])
 
--- | Evaluate and unwrap elliTransform'.
-tElli :: Expr -> Expr -> Expr
-tElli begin end =
-    case evalState (runMaybeT (tElli' begin end)) (0, []) of
+-- | Evaluate and unwrap tElli'.
+tElliExpr :: Expr -> Expr -> Expr
+tElliExpr begin end =
+    case evalState (runMaybeT (tElliExpr' begin end)) (0, []) of
         Just r  -> r
         Nothing -> error "Could not transform ellipsis: Mismatched structures."
 
@@ -102,9 +102,9 @@ tElli begin end =
 -- (Example is for three lists)
 -- f(x[ix], y[iy], z[iz]) ... f(x[kx], y[ky], z[kz])
 -- zipWith3 (\_x _y _z -> f(_x, _y, _z)) (range x ix kx) (range y iy ky) (range z iz kz)
-tElli' :: Expr -> Expr -> MaybeT (State ElliState) Expr
-tElli' b e = do
-    transformedTree <- gzipM (mkMMMaybeT tElliInner') b e
+tElliExpr' :: Expr -> Expr -> MaybeT (State ElliState) Expr
+tElliExpr' b e = do
+    transformedTree <- gzipM (mkMMMaybeT tInterpolateGo) b e
     tElliOuter transformedTree
 
 tElliOuter :: Expr -> MaybeT (State ElliState) Expr
@@ -122,13 +122,13 @@ tElliOuter transformedTree = do
     makeRange ElliRange {ed_t=ElliList n, ed_ib=ib, ed_ie=ie} = Var "listRange" `App` Var n `App` ib `App` ie
     makeRange ElliRange {ed_t=ElliCounter, ed_ib=ib, ed_ie=ie} = Var "range" `App` ib `App` ie
 
-tElliInner :: Expr -> Expr -> MaybeT (State ElliState) Expr
-tElliInner b e = gzipM (mkMMMaybeT tElliInner') b e
+tInterpolate :: Expr -> Expr -> MaybeT (State ElliState) Expr
+tInterpolate b e = gzipM (mkMMMaybeT tInterpolateGo) b e
 
 -- | Used generically to run over every expression
-tElliInner' :: Expr -> Expr -> MaybeT (State ElliState) Expr
+tInterpolateGo :: Expr -> Expr -> MaybeT (State ElliState) Expr
 -- xi...xk ==> collect (id, x, i, k) and output _x<id> as a variable
-tElliInner' (ListElement nl idxl) (ListElement nr idxr)
+tInterpolateGo (ListElement nl idxl) (ListElement nr idxr)
     | nl /= nr      = error "ListElements refer to different lists"
     | otherwise = do
         (id, rs) <- lift get
@@ -142,41 +142,41 @@ tElliInner' (ListElement nl idxl) (ListElement nr idxr)
 -- (xi ... xk) ... (xj ... xn)
 -- ==> (id, x, i k) ... (id2, x, j, n)
 -- ==> (id, x, a, b) where a= i..j, b=k..n  
-tElliInner' (Ellipsis ll lr) (Ellipsis rl rr) = do
+tInterpolateGo (Ellipsis ll lr) (Ellipsis rl rr) = do
     s@(id,rs) <- lift get
     -- These computations are contained and do not affect state, other than
     -- increasing the id for the purpose of disambiguation.
-    let (l, (idl, _)) = runState (runMaybeT $ tElli' ll lr) s
-    let (r, (idr, _)) = runState (runMaybeT $ tElli' rl rr) s
+    let (l, (idl, _)) = runState (runMaybeT $ tElliExpr' ll lr) s
+    let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' rl rr) s
     l' <- hoistMaybe l
     r' <- hoistMaybe r
     guard $ idl == idr  -- Just quickly check the state
     lift $ put (id+idl,rs)
-    gzipM (mkMMMaybeT tElliInner') l' r'
+    gzipM (mkMMMaybeT tInterpolateGo) l' r'
 
-tElliInner' (ElliFoldr ll lr opl) (ElliFoldr rl rr opr)
+tInterpolateGo (ElliFoldr ll lr opl) (ElliFoldr rl rr opr)
     | opl /= opr = mzero
     | otherwise  = do
         s@(id,rs) <- lift get
         -- These computations are contained and do not affect state, other than
         -- increasing the id for the purpose of disambiguation.
-        let (l, (idl, _)) = runState (runMaybeT $ tElli' ll lr) s
-        let (r, (idr, _)) = runState (runMaybeT $ tElli' rl rr) s
+        let (l, (idl, _)) = runState (runMaybeT $ tElliExpr' ll lr) s
+        let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' rl rr) s
         l' <- hoistMaybe l
         r' <- hoistMaybe r
         guard $ idl == idr  -- Just quickly check the state
         lift $ put (id+idl,rs)
-        res <- gzipM (mkMMMaybeT tElliInner') l' r'
+        res <- gzipM (mkMMMaybeT tInterpolateGo) l' r'
         return $ Var "foldr1" `App` opl `App` res
         
 
 -- Just stop computation here, otherwise we can accidentally pollute state
-tElliInner' (ER l) (ER r) | ed_id l == ed_id r = return $ ER l
+tInterpolateGo (ER l) (ER r) | ed_id l == ed_id r = return $ ER l
                                    | otherwise          = mzero
 -- Group up expressions, for example:
 -- [k1 + 1] ... [k2 + 5] (which generates k1+1..k2+5)
 -- is different from [k1] + [1] ... [k2] + [5], which generates (k1..k2 and 1..5)
-tElliInner' (ElliGroup l) (ElliGroup r) = do
+tInterpolateGo (ElliGroup l) (ElliGroup r) = do
     (id, rs) <- lift get
     let er = ElliRange { ed_id=id
                        , ed_t=ElliCounter
@@ -187,9 +187,9 @@ tElliInner' (ElliGroup l) (ElliGroup r) = do
     return $ Var $ makeElliAlias er
 
 -- [] ... [x1 ... xn]
-tElliInner' (Value Empty) (Ellipsis rl rr) = do
+tInterpolateGo (Value Empty) (Ellipsis rl rr) = do
     s@(id,rs) <- lift get
-    let (r, (idr, nestedrs)) = runState (runMaybeT $ tElliInner rl rr) s
+    let (r, (idr, nestedrs)) = runState (runMaybeT $ tInterpolate rl rr) s
     r' <- hoistMaybe r
     let er = ElliRange { ed_id=id+idr
                         , ed_t=ElliCounter
@@ -203,9 +203,9 @@ tElliInner' (Value Empty) (Ellipsis rl rr) = do
         Nothing     -> mzero
 
 -- [x1...xn] ... []
-tElliInner' (Ellipsis ll lr) (Value Empty) = do
+tInterpolateGo (Ellipsis ll lr) (Value Empty) = do
     s@(id,rs) <- lift get
-    let (l, (idl, nestedrs)) = runState (runMaybeT $ tElliInner ll lr) s
+    let (l, (idl, nestedrs)) = runState (runMaybeT $ tInterpolate ll lr) s
     case l of
         (Just l') -> do
             let er = ElliRange { ed_id=id+idl
@@ -223,7 +223,7 @@ tElliInner' (Ellipsis ll lr) (Value Empty) = do
 -- [x1] ... [x1...xn]       ==> [x1], [x1, x2], [x1,x2,x3], ...
 -- [x1, x2] ... [x1...xn]   ==> [x1,x2], [x1,x2,x3], ...
 -- and so on
-tElliInner' xs@(Cons _ _) (Ellipsis rl rr) = do
+tInterpolateGo xs@(Cons _ _) (Ellipsis rl rr) = do
     {-
     Using this example:
     zipInits (x1...xn) (y1...ym) =
@@ -234,7 +234,7 @@ tElliInner' xs@(Cons _ _) (Ellipsis rl rr) = do
     -- Transform the Ellipsis on the right side.
     -- [(x1, y1) ... (xn, yn)] ==> (_x1, _y0) + (rangeX, rangeY)
     s@(id,rngs) <- lift get
-    let (r, (idr, nestedrngs)) = runState (runMaybeT $ tElliInner rl rr) s
+    let (r, (idr, nestedrngs)) = runState (runMaybeT $ tInterpolate rl rr) s
     lift $ put (id+idr, rngs) -- Increase ID so we don't step on feet later
     r' <- hoistMaybe r
 
@@ -320,7 +320,7 @@ tElliInner' xs@(Cons _ _) (Ellipsis rl rr) = do
 
 -- Catch-all: if you can take both sides and turn it into a simple counter,
 -- then do that. Otherwise, keep iterating in.
-tElliInner' l r 
+tInterpolateGo l r 
     | not (isElliAble l && isElliAble r) = mzero -- Continue
     | l == r    = mzero
     | otherwise = do
