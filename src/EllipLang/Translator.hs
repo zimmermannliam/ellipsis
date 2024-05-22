@@ -7,7 +7,7 @@ module EllipLang.Translator (translate, translate', isCore, tElliExpr) where
 import EllipLang.Syntax
 import EllipLang.Pretty (pp, makeElliAlias)
 import EllipLang.Eval (idxToExpr)
-import EllipLang.SmartCons ((<.>), inte, listToCons, unConsSafe, cons)
+import EllipLang.SmartCons ((<.>), inte, listToCons, unConsSafe, cons, x, y)
 
 import GenericHelper (everywhereUntil, mkMMMaybeT, gzipM, mkQQ, mkQQMaybe, gzipQ, hoistMaybe, mapWithIdx)
 
@@ -27,7 +27,10 @@ data ElliClass = Fold Expr ElliClass
                | ZipWith Int
 
 toZipWithN :: Int -> Expr
-toZipWithN i = map Var ["id", "map", "zipWith", "zipWith3", "zipWith4", "zipWith5"] !! i
+toZipWithN 0 = Var "id"
+toZipWithN 1 = Var "map"
+toZipWithN 2 = Var "zipWith"
+toZipWithN i = Var ("zipWith" ++ show i)
 
 lengthFun = Var "length"
 subscriptFun = Var "(!!)"
@@ -58,10 +61,11 @@ tExpr = everywhereUntil (False `mkQ` endTraversal) (mkT tExpr' )
   where
     tExpr' :: Expr -> Expr
     tExpr' (Ellipsis b e)      = tElliExpr b e
-    tExpr' (ElliFoldr b e f)    = Var "foldr1" `App` f `App` tElliExpr b e
+    tExpr' (ElliFoldr b e f)    = Var "foldr1" `App` (x <.> y <.> Op f x y) `App` tElliExpr b e
+    tExpr' (ElliFoldl b e f)    = Var "foldl1" `App` (x <.> y <.> Op f x y) `App` tElliExpr b e
     tExpr' (ListElement n idx) = subscriptFun 
         `App` Var n 
-        `App` (idx `Sub` inte 1)
+        `App` (idx `sub` inte 1)
     tExpr' (Case target alts) =
         let alts' = map tAlt alts
         in Case target alts'
@@ -167,7 +171,7 @@ tInterpolateGo (ElliFoldr ll lr opl) (ElliFoldr rl rr opr)
         guard $ idl == idr  -- Just quickly check the state
         lift $ put (id+idl,rs)
         res <- gzipM (mkMMMaybeT tInterpolateGo) l' r'
-        return $ Var "foldr1" `App` opl `App` res
+        return $ Var "foldr1" `App` (x <.> y<.> Op opl x y) `App` res
         
 
 -- Just stop computation here, otherwise we can accidentally pollute state
@@ -313,7 +317,7 @@ tInterpolateGo xs@(Cons _ _) (Ellipsis rl rr) = do
             if n == elliName 
             then Just [Just (idx, range)]
             else Just [Nothing]
-        Nothing -> Just [Nothing]
+        _       -> Just [Nothing]
     compareTerm _ l r | toConstr l == toConstr r = Nothing
                       | otherwise = Just [Nothing]
     

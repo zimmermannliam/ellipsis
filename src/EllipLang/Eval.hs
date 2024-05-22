@@ -78,24 +78,24 @@ eval e (Error s) = errorOut e s
 eval e (Trace s tt t) = trace (s ++ ": " ++ ppVal (eval e tt)) $ eval e t
 
 -- Relational operators
-eval e (Eq t1 t2) = Boolean (eval e t1 == eval e t2)
-eval e (Neq t1 t2) = Boolean (eval e t1 /= eval e t2)
-eval e (Lt t1 t2) = case (eval e t1, eval e t2) of
+eval e (Op Eq t1 t2) = Boolean (eval e t1 == eval e t2)
+eval e (Op Neq t1 t2) = Boolean (eval e t1 /= eval e t2)
+eval e (Op Lt t1 t2) = case (eval e t1, eval e t2) of
     (Con x1, Con x2)    -> Boolean $ x1 < x2
     (v1, v2)            -> errorOut e $ "Tried to Lt two non-integers: " ++ show v1 ++ " < " ++ show v2
-eval e (Gt t1 t2) = case (eval e t1, eval e t2) of
+eval e (Op Gt t1 t2) = case (eval e t1, eval e t2) of
     (Con x1, Con x2)    -> Boolean $ x1 > x2
     (v1, v2)            -> errorOut e $ "Tried to Gt two non-integers: " ++ show v1 ++ " > " ++ show v2
-eval e (Leq t1 t2) = case (eval e t1, eval e t2) of
+eval e (Op Leq t1 t2) = case (eval e t1, eval e t2) of
     (Con x1, Con x2)    -> Boolean $ x1 <= x2
     (v1, v2)            -> errorOut e $ "Tried to Leq two non-integers: " ++ show v1 ++ " <= " ++ show v2
-eval e (Geq t1 t2) = case (eval e t1, eval e t2) of
+eval e (Op Geq t1 t2) = case (eval e t1, eval e t2) of
     (Con x1, Con x2)    -> Boolean $ x1 >= x2
     (v1, v2)            -> errorOut e $ "Tried to Geq two non-integers: " ++ show v1 ++ " >= " ++ show v2
-eval e (Or t1 t2) = case (eval e t1, eval e t2) of
+eval e (Op Or t1 t2) = case (eval e t1, eval e t2) of
     (Boolean b1, Boolean b2)    -> Boolean $ b1 || b2
     (v1, v2)                    -> errorOut e $ "Tried to OR non-booleans: " ++ show v1 ++ " || " ++ show v2
-eval e (And t1 t2) = case (eval e t1, eval e t2) of
+eval e (Op And t1 t2) = case (eval e t1, eval e t2) of
     (Boolean b1, Boolean b2)    -> Boolean $ b1 && b2
     (v1, v2)                    -> errorOut e $ "Tried to AND non-booleans: " ++ show v1 ++ " && " ++ show v2
 eval e (Not t) = case eval e t of
@@ -103,29 +103,28 @@ eval e (Not t) = case eval e t of
     v           -> errorOut e $ "Tried to NOT a non-boolean: " ++ show v
 
 -- Arithmetic operators
-eval e (Add t1 t2) = case (eval e t1, eval e t2) of
+eval e (Op Add t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 + i2)
     (v1, v2)            -> errorOut e $ "Bad add terms: " ++ show v1 ++ " + " ++ show v2
-eval e (Sub t1 t2) = case (eval e t1, eval e t2) of
+eval e (Op Sub t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 - i2)
     (v1, v2)            -> errorOut e $ "Bad sub terms: " ++ show v1 ++ " - " ++ show v2
-eval e (Mul t1 t2) = case (eval e t1, eval e t2) of
+eval e (Op Mul t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 * i2)
     _                   -> errorOut e "Bad mul terms"
-eval e (Div t1 t2) = case (eval e t1, eval e t2) of
+eval e (Op Div t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 `div` i2)
     _                   -> errorOut e "Bad div terms"
-eval e (Mod t1 t2) = case (eval e t1, eval e t2) of
+eval e (Op Mod t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2)    -> Con (i1 `mod` i2)
     _                   -> errorOut e "Bad mod terms"
 eval e (Abs t) = case eval e t of
     (Con i)             -> Con (abs i)
     _                   -> errorOut e "Bad abs term"
 
+eval e (Op (VarOp f) t1 t2) = eval e $ App (App (Var f) t1) t2
+
 eval e (Infix f t1 t2) = eval e (f `App` t1 `App` t2)
-eval e (ElliFoldr t1 tn f) = 
-    let list = unVCons (eval e (Ellipsis t1 tn))
-    in eval e $ foldValToExpr (\a b -> f `App` a `App` b) list
 eval e (Btwn t1 t2) = case (eval e t1, eval e t2) of
     (Con i1, Con i2) -> vcons [i1..i2]
     _                -> error "bad btwn"
@@ -221,7 +220,9 @@ elliToComp' (ElliComp tb rsb) (ElliComp te rse) =
 elliToComp' (Cons t1b t2b) (Cons t1e t2e)   = doTwo Cons (t1b, t2b) (t1e,t2e)
 elliToComp' (Cat t1b t2b) (Cat t1e t2e)     = doTwo Cat (t1b, t2b) (t1e,t2e)
 elliToComp' (Error s1) (Error s2)             = return $ Error s1
-elliToComp' (Add t1b t2b) (Add t1e t2e)     = doTwo Add (t1b, t2b) (t1e, t2e)
+elliToComp' (Op op1 t1b t2b) (Op op2 t1e t2e) | op1 == op2 = doTwo (Op op1) (t1b, t2b) (t1e, t2e)
+                                              | otherwise = error "bad ops"
+
 elliToComp' (Pair t1b t2b) (Pair t1e t2e)   = doTwo Pair (t1b, t2b) (t1e, t2e)
 elliToComp' (EllipVar ib') (EllipVar ie')     = mergeEllipVars ib' ie'
 elliToComp' (EllipVar idb') (ListElement ve idxe) = do

@@ -45,33 +45,39 @@ pp' tabs (Cat t1 t2) = pp' tabs t1 ++ " ++ " ++ pp' tabs t2
 pp' tabs (ListElement n (Var i))    = n ++ i
 pp' tabs (ListElement n (Value (Con i)))    = n ++ show i
 pp' tabs (ListElement n i)    = n ++ "{" ++ ppIdx i ++ "}"
-pp' tabs (Add e1 e2)          = pp' tabs e1 ++ "+" ++ pp' tabs e2
-pp' tabs (Sub t1 t2)          = pp' tabs t1 ++ "-" ++ pp' tabs t2
-pp' tabs (Mul t1 t2)          = pp' tabs t1 ++ "*" ++ pp' tabs t2
-pp' tabs (Div t1 t2)          = pp' tabs t1 ++ "/" ++ pp' tabs t2
-pp' tabs (Mod t1 t2)          = pp' tabs t1 ++ "%" ++ pp' tabs t2
+pp' tabs (Op op e1 e2)        = pp' tabs e1 ++ " " ++ ppOp op ++ " " ++ pp' tabs e2 
 pp' tabs (Abs t)              = "|" ++ pp' tabs t ++ "|"
 pp' tabs (Trace _ _ t)        = pp' tabs t
-pp' tabs (Eq t1 t2)           = pp' tabs t1 ++ " == " ++ pp' tabs t2
-pp' tabs (Neq t1 t2)           = pp' tabs t1 ++ " != " ++ pp' tabs t2
-pp' tabs (Lt t1 t2)           = pp' tabs t1 ++ " < " ++ pp' tabs t2
-pp' tabs (Gt t1 t2)           = pp' tabs t1 ++ " > " ++ pp' tabs t2
-pp' tabs (Leq t1 t2)          = pp' tabs t1 ++ " <= " ++ pp' tabs t2
-pp' tabs (Geq t1 t2)          = pp' tabs t1 ++ " >= " ++ pp' tabs t2
-pp' tabs (Or t1 t2)           = pp' tabs t1 ++ " || " ++ pp' tabs t2
-pp' tabs (And t1 t2)          = pp' tabs t1 ++ " && " ++ pp' tabs t2
 pp' tabs (Not t)              = "not (" ++ pp' tabs t ++ ")"
 pp' tabs (Error s)            = "error \"" ++ s ++ "\""
 pp' tabs ellip@(ElliComp _ _) = ppEllip ellip
 pp' tabs (EllipVar i)         = "EllipVar(" ++ show i ++ ")"
 pp' tabs (Ellipsis t1 t2)  = "[" ++ pp' tabs t1 ++ ",...," ++ pp' tabs t2 ++ "]"
 pp' tabs (Index idx)          = ppIdx idx
-pp' tabs (ElliFoldr t1 t2 f) 
-    = "(" ++ pp' tabs t1 ++ " `" ++ pp' tabs f ++ "` ... `" ++ pp' tabs f ++ "` " ++ pp' tabs t2 ++ ")"
+pp' tabs (ElliFoldr t1 t2 op) 
+    = pp' tabs t1 ++ " " ++ ppOp op ++ " (... " ++ ppOp op ++ " " ++ pp' tabs t2 ++ ")"
+pp' tabs (ElliFoldl t1 t2 op) 
+    = "(" ++ pp' tabs t1 ++ " " ++ ppOp op ++ " ...) " ++ ppOp op ++ " "++ pp' tabs t2
 pp' tabs (ER r)             = makeElliAlias r
 pp' tabs (Btwn t1 t2) = "[" ++ pp' tabs t1 ++ ".." ++ pp' tabs t2 ++ "]"
 pp' tabs (ElliGroup t) = "[" ++ pp' tabs t ++ "]"
 -- pp' tabs _            = "Error -- cannot display expression"
+
+ppOp :: IfxOp -> String
+ppOp Add    = "+"
+ppOp Sub    = "-" 
+ppOp Mul    = "*" 
+ppOp Div    = "/" 
+ppOp Mod    = "%" 
+ppOp Eq     = "=="
+ppOp Neq    = "!="
+ppOp Lt     = "<" 
+ppOp Gt     = ">" 
+ppOp Leq    = "<="
+ppOp Geq    = ">="
+ppOp Or     = "||"
+ppOp And    = "&&"
+ppOp (VarOp s) = "`" ++ s ++ "`"
 
 ppList :: Int -> Expr -> String
 ppList tabs (Value Empty) = ""

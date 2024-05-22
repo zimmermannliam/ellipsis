@@ -48,16 +48,16 @@ prelude = Map.union prelude' $ Map.fromList
 
 listRange' :: Expr
 listRange' = 
-    xs <.> begin <.> end <.> Case (begin `Lt` inte 1) --of
+    xs <.> begin <.> end <.> Case (begin `lt` inte 1) --of
     [
         (PVal $ Boolean True, Value Empty),
-        (PVal $ Boolean False, Case (begin `Gt` (Var "length" `App` xs))
+        (PVal $ Boolean False, Case (begin `gt` (Var "length" `App` xs))
         [
             (PVal $ Boolean True, Value Empty),
-            (PVal $ Boolean False, Case (end `Lt` inte 1)
+            (PVal $ Boolean False, Case (end `lt` inte 1)
             [
                 (PVal $ Boolean True, Value Empty),
-                (PVal $ Boolean False, (Var "drop" `App` (begin `Sub` inte 1)) `App` (Var "take" `App` end `App` xs))
+                (PVal $ Boolean False, (Var "drop" `App` (begin `sub` inte 1)) `App` (Var "take" `App` end `App` xs))
             ])
         ])
     ]
@@ -65,7 +65,7 @@ listRange' =
 
 range' :: Expr
 range' =
-    l <.> r <.> Case (l `Leq` r) -- of
+    l <.> r <.> Case (l `leq` r) -- of
         [ (PVal $ Boolean True,     Btwn l r)
         , (PVal $ Boolean False,    Var "reverse" `App` Btwn r l)
         ]
@@ -84,13 +84,13 @@ cat' =
 
 drop' :: Expr
 drop' =
-    n <.> list <.> LetRec "drop" (k <.> xs <.> Case (k `Leq` inte 0) -- of
+    n <.> list <.> LetRec "drop" (k <.> xs <.> Case (k `leq` inte 0) -- of
     [
         (PVal $ Boolean True, xs),
         (PVal $ Boolean False, Case xs -- of
         [
             (PVal Empty, xs),
-            (PCons "y" "ys", Var "drop" `App` (k `Sub` inte 1) `App` ys)
+            (PCons "y" "ys", Var "drop" `App` (k `sub` inte 1) `App` ys)
         ])
     ])
     -- in
@@ -98,13 +98,13 @@ drop' =
     
 take' :: Expr
 take' =
-    n <.> list <.> LetRec "take" (k <.> xs <.> Case (k `Leq` inte 0) -- of
+    n <.> list <.> LetRec "take" (k <.> xs <.> Case (k `leq` inte 0) -- of
     [
         (PVal $ Boolean True, Value Empty),
         (PVal $ Boolean False, Case xs -- of
         [
             (PVal Empty, Value Empty),
-            (PCons "y" "ys", Cons y (Var "take" `App` (k `Sub` inte 1) `App` ys))
+            (PCons "y" "ys", Cons y (Var "take" `App` (k `sub` inte 1) `App` ys))
         ])
     ])
     -- in
@@ -116,7 +116,7 @@ length' =
         Case l1 -- of
         [
             (PVal Empty, inte 0),
-            (PCons "x" "xs", inte 1 `Add` (Var "length" `App` xs))
+            (PCons "x" "xs", inte 1 `add` (Var "length" `App` xs))
         ]
     )
     -- in
@@ -151,7 +151,7 @@ zipWith' =
 
 -- For map
 succ' :: Expr
-succ' = x <.> x `Add` inte 1
+succ' = x <.> x `add` inte 1
 
 foldr1' :: Expr
 foldr1' = fn <.> list <.> 
@@ -199,20 +199,23 @@ zip3' =
         )
     )
 
+unVar :: Expr -> String
+unVar (Var s) = s
+
 fold' :: Expr
 fold' = f <.> xs <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> ElliFoldr (x!.1) (x!n) f
+    (x, 1) <..> (x, n)  ==> ElliFoldr (x!.1) (x!n) (VarOp $ unVar f)
     )
 
 pairAdj :: Expr
 pairAdj = xs <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> ((x!.1) `Pair` (x!.2)) <...> ((x!(n `Sub` inte 1)) `Pair` (x!n))
+    (x, 1) <..> (x, n)  ==> ((x!.1) `Pair` (x!.2)) <...> ((x!(n `sub` inte 1)) `Pair` (x!n))
     )
 
 rotL :: Expr
 rotL = xs <.> k <.> case1 xs (
-    (x, 1) <..> (x, n)  ==> Let "k'" (k `Mod` n) $
-        ((x!(k' `Add` inte 1)) <...> (x!n)) `Cat` ((x!.1) <...> (x!k'))
+    (x, 1) <..> (x, n)  ==> Let "k'" (k `mod'` n) $
+        ((x!(k' `add` inte 1)) <...> (x!n)) `Cat` ((x!.1) <...> (x!k'))
     )
 
 inits' :: Expr
@@ -257,6 +260,24 @@ inits4 = Abstr "xs" $ Case xs -- of
         (((x!.1) <:> empt) <++> ((x!.2) <...> (x!n))))
     ]
 
+initsAndaddEnumerate :: Expr
+initsAndaddEnumerate =
+    xs <.> case1 xs -- of
+    ((x, 1) <..> (x, n) ==>
+        (empt <:> empt) <++>
+        (( ((x!.1) `add` inte 1) <:> empt)
+        <...>
+        (( (x!.1) `add` inte 1) <...> ((x!n) `add` n)))
+    )
+
+initsAndaddEnumerate' :: Expr
+initsAndaddEnumerate' =
+    xs <.> case1 xs -- of
+    ((x, 1) <..> (x, n) ==>
+        ((empt)
+        <...>
+        (( (x!.1) `add` inte 1) <...> ((x!n) `add` n)))
+    )
 
 -- zipInits [x1...xn] [y1...ym] = [[(x1, y1)], [(x1, y1), (x2, y2)], ..., [(x1, y1)...(xn,ym)]]
 -- zipInits [x1...xn] [y1...ym] = [[(x1, y1)]]++[[(x1, y1), (x2, y2)], ..., [(x1, y1)...(xn,ym)]]
@@ -281,10 +302,10 @@ binSearch :: Expr
 binSearch = list <.> term <.> LetRec "binSearch" (xs <.> t <.>
     Case xs -- of
         [   PVal Empty          ==> false
-        ,   (x, 1) <..> (x, n)  ==> Let "k" ((n `Div` inte 2) `Add` inte 1) $
-                if' ((x!k) `Eq` t)          true
-                else' $ if' (x!k `Gt` t)    (binSearch' `App` ((x!.1) <...> (x!(k `Sub` inte 1))) `App` t)
-                else'                       (binSearch' `App` ((x!(k `Add` inte 1)) <...> (x!n)) `App` t)
+        ,   (x, 1) <..> (x, n)  ==> Let "k" ((n `div'` inte 2) `add` inte 1) $
+                if' ((x!k) `eq` t)          true
+                else' $ if' (x!k `gt` t)    (binSearch' `App` ((x!.1) <...> (x!(k `sub` inte 1))) `App` t)
+                else'                       (binSearch' `App` ((x!(k `add` inte 1)) <...> (x!n)) `App` t)
         ]
     ) -- in
     (binSearch' `App` list `App` term)
@@ -324,7 +345,7 @@ firstK = xs <.> k <.> case1 xs (
 removeKth :: Expr
 removeKth = xs <.> k <.> case1 xs (
     (x, 1) <..> (x, n)  ==> 
-        ((x!.1) <...> (x!(k `Sub` inte 1))) `Cat` ((x!(k `Add` inte 1)) <...> (x!n))
+        ((x!.1) <...> (x!(k `sub` inte 1))) `Cat` ((x!(k `add` inte 1)) <...> (x!n))
     )
 
 pairWithHead :: Expr
@@ -336,7 +357,7 @@ pairWithHead = Abstr "xs" $ Case xs -- of
     )]
 
 add' :: Expr
-add' = a <.> b <.> (a `Add` b)
+add' = a <.> b <.> (a `add` b)
 
 enumerate :: Expr
 enumerate = xs <.> case1 xs (
@@ -349,16 +370,16 @@ enumerate = xs <.> case1 xs (
 tryElliGroup :: Expr
 tryElliGroup = xs <.> a <.> b <.> case1 xs (
     (x, 1) <..> (x, n) ==>
-        ((x!.1) `Pair` (ElliGroup $ a `Add` (inte 1)))
+        ((x!.1) `Pair` (ElliGroup $ a `add` (inte 1)))
         <...>
-        ((x!n) `Pair` (ElliGroup $ b `Add` (inte 5)))
+        ((x!n) `Pair` (ElliGroup $ b `add` (inte 5)))
     )
 tryElliGroup2 :: Expr
 tryElliGroup2 = xs <.> a <.> b <.> case1 xs (
     (x, 1) <..> (x, n) ==>
-        ((x!.1) `Pair` (a `Add` (inte 1)))
+        ((x!.1) `Pair` (a `add` (inte 1)))
         <...>
-        ((x!n) `Pair` (b `Add` (inte 5)))
+        ((x!n) `Pair` (b `add` (inte 5)))
     )
 
 scanl1' :: Expr
@@ -373,7 +394,15 @@ scanl1' = f <.> xs <.> case1 xs (
 sum' :: Expr
 sum' = xs <.> case1 xs (
     (x, 1) <..> (x, n) ==>
-        ElliFoldr (x!.1) (x!n) (a <.> b <.> a `Add` b)
+        ElliFoldr (x!.1) (x!n) (Add)
+    )
+
+nestedTest :: Expr
+nestedTest = xs <.> case1 xs (
+    (x, 1) <..> (x, n) ==>
+        (((x!.1) `add` inte 1) `Ellipsis` ((x!n) `add` inte 1))
+        `Ellipsis`
+        (((x!.1) `add` n) `Ellipsis` ((x!n) `add` n))
     )
 
 ------------------------------------------------------------------------
@@ -421,7 +450,7 @@ nthRecursive = Abstr "l" $ Abstr "n" $
                     ]),
                     (PVar "rem", Case (Var "list")
                     [
-                        (PCons "x" "xs", App (App (Var "nth") (Var "xs")) (Sub (Var "rem") (Value $ Con 1))),
+                        (PCons "x" "xs", App (App (Var "nth") (Var "xs")) (sub (Var "rem") (Value $ Con 1))),
                         (PVal Empty, Error "Too far"),
                         (PVar "_", Error "Bad")
                     ])
@@ -432,7 +461,7 @@ sumRecursive :: Expr
 sumRecursive = Abstr "l" $ LetRec "sum" (Abstr "list" $ Case (Var "list") 
     [
         (PVal Empty, Value $ Con 0), 
-        (PCons "x" "xs", Add (Var "x") (App (Var "sum") (Var "xs")))
+        (PCons "x" "xs", add (Var "x") (App (Var "sum") (Var "xs")))
     ]) 
     -- in
     (App (Var "sum") (Var "l"))
@@ -441,7 +470,7 @@ lenRecursive :: Expr
 lenRecursive = Abstr "l" $ LetRec "len" (Abstr "list" $ Case (Var "list")
     [
         (PVal Empty, Value $ Con 0),
-        (PCons "x" "xs", Add (Value $ Con 1) (App (Var "len") (Var "xs")))
+        (PCons "x" "xs", add (Value $ Con 1) (App (Var "len") (Var "xs")))
     ])
     -- in
     (App (Var "len") (Var "l"))
@@ -461,7 +490,7 @@ removeNthRecursive = Abstr "l" $ Abstr "i" $
                     (PCons "x" "xs", Cons (Var "x") 
                                            (App (App (Var "removeNth") 
                                                (Var "xs")) 
-                                               (Add (Var "idx'") (Value $ Con (-1)))
+                                               (add (Var "idx'") (Value $ Con (-1)))
                                            )
                     ),
                     (PVal Empty, Error "nonzero idx out of bounds"),

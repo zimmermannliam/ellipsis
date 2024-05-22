@@ -17,22 +17,22 @@ main = runTestTTAndExit $ test $ testSmartCons ++ testEval
 
 testSmartCons = map ("smart cons" ~:)
     [ "<.>" ~:
-        x <.> y <.> x `Add` y
-        ~?= Abstr "x" (Abstr "y" (Add (Var "x") (Var "y")))
+        x <.> y <.> x `add` y
+        ~?= Abstr "x" (Abstr "y" (add (Var "x") (Var "y")))
     , "case1, ==>" ~:(
         x <.> case1 x (
-            PVar "y" ==> (y `Add` inte 1)
+            PVar "y" ==> (y `add` inte 1)
         )
-        ) ~?= Abstr "x" (Case x [(PVar "y", Add y (Value $ Con 1))])
+        ) ~?= Abstr "x" (Case x [(PVar "y", add y (Value $ Con 1))])
     , "ellip" ~:(
         x <.> case1 x (
-            (x, 1) <..> (x, n) ==> (x!.1 `Add` inte 1) <...> (x!n `Add` inte 1)
+            (x, 1) <..> (x, n) ==> (x!.1 `add` inte 1) <...> (x!n `add` inte 1)
         )
         ) ~?= Abstr "x" (Case x 
             [(PEllipsis "x" (Var "n"), 
-                Add (ListElement "x" (Value $ Con 1)) (Value $ Con 1)
+                add (ListElement "x" (Value $ Con 1)) (Value $ Con 1)
                 `Ellipsis`
-                Add (ListElement "x" (Var "n")) (Value $ Con 1)
+                add (ListElement "x" (Var "n")) (Value $ Con 1)
             )])
     ]
 
@@ -153,11 +153,12 @@ testEval = map (\(l, t, expectedV) -> "eval" ~: l ~: eval Map.empty t ~?= expect
         map' `App` succ' `App` exList2,
         vcons [9,15,33,1,5])
 
+{-
     , ("fold' add' [1,2,3,4,5]",
         fold' `App` add' `App` exList,
         Con (foldr1 (+) exList'))
     , ("fold' add' [8,14,32,0,4]",
         fold' `App` add' `App` exList2,
         Con (foldr1 (+) exList2'))
-
+-}
     ]

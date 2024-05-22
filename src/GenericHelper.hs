@@ -10,11 +10,12 @@
 module GenericHelper where
 
 import Data.Generics (Data, Typeable, GenericT, GenericQ, GenericM, gzipWithM, toConstr, cast, gmapT, gmapQ, gzipWithQ
-    , everything, mkQ)
+    , everything, mkQ, gshow)
 import Control.Monad.Trans.Maybe
 import Control.Monad (mzero, guard)
 import Control.Monad.Trans (lift)
 import Control.Applicative ((<|>))
+import Debug.Trace (trace)
 
 everywhereUntil :: GenericQ Bool -> GenericT -> GenericT
 -- Variation on everywhere:
@@ -34,7 +35,7 @@ gzipM :: (Monad m, Typeable m)
 gzipM f x y = do
     f x y <|> if toConstr x == toConstr y
         then gzipWithM (gzipM f) x y
-        else mzero
+        else trace ("mismatch: " ++ gshow x ++ " VERSUS " ++ gshow y) mzero
 
 mkMMMaybeT :: (Monad m, Typeable m, Data a)
     => (a -> a -> MaybeT m a) 

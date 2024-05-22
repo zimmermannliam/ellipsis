@@ -19,24 +19,13 @@ data Expr = Var Name                -- Variable
           | Pair Expr Expr          -- (expr1, expr2)
           | ListElement Name Idx    -- x[k]
           | Trace String Expr Expr  -- Debug
-          | Eq Expr Expr            -- Relational Operators
-          | Lt Expr Expr
-          | Gt Expr Expr
-          | Leq Expr Expr
-          | Geq Expr Expr
-          | Neq Expr Expr
-          | Or Expr Expr            -- Boolean Operators
+          | Op IfxOp Expr Expr
           | Not Expr
-          | And Expr Expr
-          | Add Expr Expr           -- Arithmetic Operators
-          | Sub Expr Expr
-          | Mul Expr Expr
-          | Div Expr Expr
-          | Mod Expr Expr
           | Abs Expr
           | Btwn Expr Expr
           | Ellipsis Expr Expr
-          | ElliFoldr Expr Expr Expr -- (t1) + ... + (tn) would be ElliFold t1 t2 +
+          | ElliFoldr Expr Expr IfxOp
+          | ElliFoldl Expr Expr IfxOp
           -- Processing stuff
           | EllipVar Id
           | Index Idx
@@ -45,12 +34,39 @@ data Expr = Var Name                -- Variable
           | ElliGroup Expr
           | PreElli
           deriving (Eq, Show, Data, Typeable)
-{-
-infix 8 `Pair`
-infix 8 `Gt`
-infix 8 `Lt`
-infix 8 `Geq`
-infix 8 `Leq`-}
+
+
+data IfxOp = Eq
+           | Lt 
+           | Gt 
+           | Leq
+           | Geq
+           | Neq
+           | Or
+           | And
+           | Add
+           | Sub
+           | Mul
+           | Div
+           | Mod
+           | VarOp String
+    deriving (Eq, Show, Data, Typeable)
+
+eq,lt,gt,leq,geq,neq,or,and,add,sub,mul,div',mod' :: Expr -> Expr -> Expr
+eq = Op Eq
+lt  = Op Lt 
+gt  = Op Gt 
+leq = Op Leq
+geq = Op Geq
+neq = Op Neq
+or = Op Or
+and = Op And
+add = Op Add
+sub = Op Sub
+mul = Op Mul
+div' = Op Div
+mod' = Op Mod
+
 
 data ElliRange = ElliRange {ed_id::Id, ed_t::ElliType, ed_ib::Expr, ed_ie::Expr}
     deriving (Eq, Show, Data, Typeable)

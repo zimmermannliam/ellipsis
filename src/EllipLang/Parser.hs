@@ -22,6 +22,7 @@ import Data.Generics (mkM, toConstr)
 import Data.List (maximumBy)
 import Data.List.Extra (uncons, unsnoc)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 
 type Parser = Parsec Void Text
 
@@ -29,7 +30,7 @@ resw =
     [ "if", "then", "else"
     , "\\", "->"
     , "case", "of"
-    , "..."
+    , "...", ".", ".."
     , "let", "in"
     ]
 
@@ -44,11 +45,12 @@ pExpr = makeExprParser pTerm operatorTable >>= secondPass
 
 pTerm :: Parser Expr
 pTerm = choice
-    [ pPair
+    [ try pPair
     , parens pExpr
     , pAbstr
     , pIfThenElse
     , pCase
+    , pLet
     , pBool
     , pInt
     , pListSugar
@@ -109,24 +111,24 @@ pCase = do
         expr <- pExpr
         return (pat, expr)
     
-    pPattern :: Parser Pattern
-    pPattern = choice
-        [ squareBrackets $ do -- PElli
-            begin <- try pListElement <|> pVar
-            void $ lexeme $ optional $ char ','
-            void $ lexeme $ string "..."
-            void $ lexeme $ optional $ char ','
-            end <- try pListElement <|> pVar
-            (var, idxl, idxr) <- extractListElement begin end
-            return $ PEllipsis var idxr
-        , do -- PVal
-            val <- pVal
-            return $ PVal val
-        , do -- PVar
-            ident <- pIdent
-            return $ PVar ident
-        ]
-
+pPattern :: Parser Pattern
+pPattern = choice
+    [ squareBrackets $ do -- PElli
+        begin <- try pListElement <|> pVar
+        void $ lexeme $ optional $ char ','
+        void $ lexeme $ string "..."
+        void $ lexeme $ optional $ char ','
+        end <- try pListElement <|> pVar
+        (var, idxl, idxr) <- extractListElement begin end
+        return $ PEllipsis var idxr
+    , do -- PVal
+        val <- pVal
+        return $ PVal val
+    , do -- PVar
+        ident <- pIdent
+        return $ PVar ident
+    ]
+  where
     pVal :: Parser Val
     pVal = (lexeme . try) (pTerm >>= check)
       where
@@ -160,6 +162,19 @@ pCase = do
                 Just idxl' -> return (name, idxl', idxr)
                 Nothing    -> fail $ "bad index: " ++ show idxl
 
+
+pLet :: Parser Expr
+pLet = do
+    void $ lexeme $ symbol "let"
+    v <- pIdent
+    void $ lexeme $ symbol "="
+    e1 <- pExpr
+    void $ lexeme $ symbol "in"
+    e2 <- pExpr
+    return $ Let v e1 e2
+
+
+
 pBool :: Parser Expr
 pBool = lexeme ((Value (Boolean True)  <$ string "True")
                 <|> (Value (Boolean False) <$ string "False"))
@@ -172,7 +187,7 @@ pInt = Value . Con <$> integer
     integer = lexeme L.decimal
 
 pPreElli :: Parser Expr
-pPreElli = PreElli <$ string "..."
+pPreElli = PreElli <$ symbol "..."
 
 pListSugar :: Parser Expr
 pListSugar = squareBrackets go
@@ -223,21 +238,43 @@ pListElement = do
 --
 ------------------------------------------------------------------------
 
+data Fixity = FixLeft | FixRight | FixMid
+    deriving (Show, Eq)
+
+opToFixity s = fromMaybe FixLeft (fixmap Map.!? s)
+  where
+    fixmap = Map.fromList
+        [ ("*",         FixLeft)
+        , ("`div`",     FixLeft)
+        , ("`mod`",     FixLeft)
+        , ("-",         FixLeft)
+        , ("+",         FixLeft)
+        , (":",         FixRight)
+        , ("==",        FixLeft)
+        , ("/=",        FixLeft)
+        , ("<",         FixLeft)
+        , ("<=",        FixLeft)
+        , (">",         FixLeft)
+        , (">=",        FixLeft)
+        , ("&&",        FixRight)
+        , ("||",        FixRight)
+        ]
+
 opmap = Map.fromList
-    [ ("*",         Mul)
-    , ("`div`",     Div)
-    , ("`mod`",     Mod)
-    , ("-",         Sub)
-    , ("+",         Add)
+    [ ("*",         Op Mul)
+    , ("`div`",     Op Div)
+    , ("`mod`",     Op Mod)
+    , ("-",         Op Sub)
+    , ("+",         Op Add)
     , (":",         Cons)
-    , ("==",        Eq)
-    , ("/=",        Neq)
-    , ("<",         Lt)
-    , ("<=",        Leq)
-    , (">",         Gt)
-    , (">=",        Geq)
-    , ("&&",        And)
-    , ("||",        Or)
+    , ("==",        Op Eq)
+    , ("/=",        Op Neq)
+    , ("<",         Op Lt)
+    , ("<=",        Op Leq)
+    , (">",         Op Gt)
+    , (">=",        Op Geq)
+    , ("&&",        Op And)
+    , ("||",        Op Or)
     ]
 
 opToBinExpr :: String -> (Expr -> Expr -> Expr)
@@ -254,54 +291,46 @@ operatorTable =
       , app
       ] -- 9
     , [] -- 8
-    , [ binary "*" (opToBinExpr "*")
-      , binary "`div`" (opToBinExpr "`div`")
-      , binary "`mod`" (opToBinExpr "`mod`")
+    , [ binaryL "*" (opToBinExpr "*")
+      , binaryL "`div`" (opToBinExpr "`div`")
+      , binaryL "`mod`" (opToBinExpr "`mod`")
       ] -- 7
-    , [ binary "-" (opToBinExpr "-")
-      , binary "+" (opToBinExpr "+")
+    , [ binaryL "-" (opToBinExpr "-")
+      , binaryL "+" (opToBinExpr "+")
       ] -- 6
     , [ binaryR ":" (opToBinExpr ":")
       ] -- 5
-    , [ binary "==" (opToBinExpr "==")
-      , binary "/=" (opToBinExpr "/=")
-      , binary "<" (opToBinExpr "<")
-      , binary "<=" (opToBinExpr "<=")
-      , binary ">" (opToBinExpr ">")
-      , binary ">=" (opToBinExpr ">=")
+    , [ binaryN "==" (opToBinExpr "==")
+      , binaryN "/=" (opToBinExpr "/=")
+      , binaryN "<" (opToBinExpr "<")
+      , binaryN "<=" (opToBinExpr "<=")
+      , binaryN ">" (opToBinExpr ">")
+      , binaryN ">=" (opToBinExpr ">=")
       ] -- 4
     , [ binaryR "&&" (opToBinExpr "&&")
       ] -- 3
     , [ binaryR "||" (opToBinExpr "||")
       ] -- 2
-    , [ binary "..." Ellipsis
-      , InfixL ifxElli ] -- 1
+    , [ ] -- 1
     , [] -- 0
     ]
   where
-    binary :: Text -> (Expr -> Expr -> Expr) -> Operator Parser Expr
-    binary name f = InfixL (f <$ symbol name)
+    binaryL :: Text -> (Expr -> Expr -> Expr) -> Operator Parser Expr
+    binaryL name f = InfixL (f <$ symbol name)
 
     binaryR :: Text -> (Expr -> Expr -> Expr) -> Operator Parser Expr
     binaryR name f = InfixR (f <$ symbol name)
 
+    binaryN :: Text -> (Expr -> Expr -> Expr) -> Operator Parser Expr
+    binaryN name f = InfixN (f <$ symbol name)
+
     ifx :: Parser (Expr -> Expr -> Expr)
     ifx = do
         f <- ifxExpr
-        return $ App . App f
+        return $ Op (VarOp f)
     
-    ifxExpr :: Parser Expr
-    ifxExpr = lexeme $ between (char '`') (char '`') (Var <$> pIdent)
-    
-    ifxElli :: Parser (Expr -> Expr -> Expr)
-    ifxElli = do
-        f1 <- pBinOp
-        void $ symbol "..."
-        f2 <- pBinOp
-        let f = Abstr "l" $ Abstr "r" (Var "l" `f1` Var "r")
-        if toConstr (f1 undefined undefined) /= toConstr (f2 undefined undefined)
-        then fail "different operators on elli-fold"
-        else return $ \l r -> ElliFoldr l r f
+    ifxExpr :: Parser String
+    ifxExpr = lexeme $ between (char '`') (char '`') (pIdent)
 
 
 app :: Operator Parser Expr
@@ -367,6 +396,10 @@ elliTokenToExpr xs@(Cons _ _) = case unConsSafe xs of
             Just (mySubList, rest) -> (x:mySubList):rest
             Nothing -> [x]:xs'
     preElliToElliList []               = []
+elliTokenToExpr (Op o1 (Op o2 l PreElli) r) | o1 == o2 = return $ ElliFoldl l r o1
+                                            | otherwise = fail "Bad"
+elliTokenToExpr (Op o1 l (Op o2 PreElli r)) | o1 == o2 = return $ ElliFoldr l r o1
+                                            | otherwise = fail "Bad"
 elliTokenToExpr t = gmapM (mkM elliTokenToExpr) t
 
 
