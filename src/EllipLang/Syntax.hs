@@ -26,6 +26,8 @@ data Expr = Var Name                -- Variable
           | Ellipsis Expr Expr
           | ElliFoldr Expr Expr IfxOp
           | ElliFoldl Expr Expr IfxOp
+          | ElliFoldr0 Expr Expr Expr IfxOp
+          | ElliFoldl0 Expr Expr Expr IfxOp
           -- Processing stuff
           | EllipVar Id
           | Index Idx
@@ -33,6 +35,7 @@ data Expr = Var Name                -- Variable
           | ER ElliRange
           | ElliGroup Expr
           | PreElli
+          | Decl String Expr
           deriving (Eq, Show, Data, Typeable)
 
 
@@ -85,6 +88,7 @@ data Val    = Con Int
 
 data Pattern = PCons Name Name
              | PCons' Expr Expr
+             | PCons2 Pattern Pattern
              | PVar Name
              | PVal Val
              | PEllipsis Name Idx -- x1 ... xn -> x2 ... xn

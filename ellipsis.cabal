@@ -64,10 +64,21 @@ common shared
                         text
     other-extensions: 
     other-modules:      GenericHelper
+    ghc-options:        -Wall 
+                        -Wno-name-shadowing
+                        -Wno-unused-imports 
+                        -Wno-missing-signatures 
+                        -Wno-type-defaults
+                        -Wno-unused-matches
+                        -Wno-incomplete-patterns
+                        -Wno-incomplete-uni-patterns
+                        -XOverloadedStrings 
+
 
 library EllipLang
     import: shared
     exposed-modules:
+        EllipLang
         EllipLang.Parser
         EllipLang.Examples
         EllipLang.Translator
@@ -75,11 +86,13 @@ library EllipLang
         EllipLang.Eval
         EllipLang.Syntax
         EllipLang.SmartCons
+        EllipLang.MHSPrelude
 
-executable ellipc
+executable ellirepl
     import:           shared
     main-is:          Main.hs
     other-modules:
+        EllipLang
         EllipLang.Translator
         EllipLang.Parser
         EllipLang.Pretty
@@ -87,6 +100,7 @@ executable ellipc
         EllipLang.Examples
         EllipLang.SmartCons
         EllipLang.Eval
+        EllipLang.MHSPrelude
 
 test-suite evalTest
     hs-source-dirs: tests

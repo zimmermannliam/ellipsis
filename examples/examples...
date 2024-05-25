@@ -1,69 +1,386 @@
 ------------------------------------------------------------------------
+-- 
+-- BASIC FUNCTIONS
+-- 
+------------------------------------------------------------------------
+
+catelli [x1, ..., xn] [y1, ..., ym] = [x1, ..., xn, y1, ..., ym]
+
+headelli [x1, ..., xn] = x1
+
+lastelli [x1, ..., xn] = xn
+
+tailelli [x1, ..., xn] = [x2, ..., xn]
+
+initelli [x1, ..., xn] = [x1, ..., x{n-1}]
+
+-- (Using errors instead of maybes)
+
+uncons xs = case xs of {
+    []              -> error;
+    [x1, ..., xn]   -> (x1, [x2, ..., xn]);
+}
+
+unsnoc xs = case xs of {
+    []              -> error;
+    [x1, ..., xn]   -> ([x1, ..., x{n-1}], xn);
+}
+
+singleton x = [x]
+
+null xs = xs == []
+
+lengthelli [x1, ..., xn] = n
+
+------------------------------------------------------------------------
+-- 
+-- LIST TRANSFORMATIONS
+-- 
+------------------------------------------------------------------------
+
+mapelli f [x1, ..., xn] = [f x1, ..., f xn]
+
+reverseelli [x1, ..., xn] = [xn, ..., x1]
+
+intersperse c xs = case xs of {
+    []              -> [];
+    [x1, ..., xn]   -> [x1, c] ++ ... ++ [x{n-1}, c] ++ [xn];
+}
+
+-- intercalate
+
+-- transpose
+
+-- subsequences
+
+-- permutations
+
+------------------------------------------------------------------------
+-- 
+-- FOLDS
+-- 
+------------------------------------------------------------------------
+
+foldlelli g z [x1, ..., xn] = z `g` x1 `g` ... `g` xn
+
+foldl1elli g [x1, ..., xn] = x1 `g` ... `g` xn
+
+foldrelli g z [x1, ..., xn] = x1 `g` (... `g` (xn `g` z))
+
+foldr1elli g [x1, ..., xn] = x1 `g` (... `g` xn)
+
+
+------------------------------------
+-- Special folds
+------------------------------------
+
+concat [x1, ..., xn] = x1 ++ ... ++ xn ++ []
+
+concatMap f [x1, ..., xn] = (f x1) ++ ... ++ (f xn) ++ []
+
+and [x1, ..., xn] = x1 && ... && xn && True
+
+or [x1, ..., xn] = x1 || ... || xn || False
+
+any p [x1, ..., xn] = p x1 || ... || p xn || False
+
+all p [x1, ..., xn] = p x1 && ... && p xn && True
+
+sum [x1, ..., xn] = 0 + x1 + ... + xn
+
+product [x1, ..., xn] = 1 * x1 * ... * xn
+
+maximum [x1, ..., xn] = x1 `max` ... `max` xn
+
+minimum [x1, ..., xn] = x1 `min` ... `min` xn
+
+------------------------------------------------------------------------
 --
--- TRIVIAL EXAMPLES
+-- BUILDING LISTS
 --
 ------------------------------------------------------------------------
 
--- | map f xs is the list obtained by applying f to each element of xs.
-map f [x1,...,xn] = [f x1,...,f xn]
+------------------------------------
+-- scans
+------------------------------------
 
--- | zip takes two lists and returns a list of corresponding pairs.
-zip [x1,...,xn] [y1,...,ym] = [(x1, y1),...,(xn, ym)]
--- or
-zip' [x1,...,xn] [y1,...,ym] =
-    let k = min n m
-    in [(x1, y1),...,(xk, yk)]
+{- scanl g z [x1, ..., xn]
+    = [z, (z `g` x1), (z `g` x1 `g` x2), ..., (z `g` x1 `g` ... `g` xn)]
+-}
 
--- | fold reduces the list using a binary operator from left to right.
-fold g [x1,...,xn] = x1 `g` ... `g` xn
+scanl1 g [x1, ..., xn] = [x1, (x1 `g` x2), ..., (x1 `g` ... `g` xn)]
 
--- | length xs returns the length of the list.
-length [x1,...,xn] = n
+-- scanr g z [x1, ..., xn] = [(x1 `g` (... `g` (xn `g` z))), ..., (xn `g` z), z]
 
--- | head extracts the first element of a list, which must be non-empty.
-head [x1,...,xn] = x1
+-- scanr1 g [x1, ..., xn] = [x1 `g` (... `g` xn), ..., xn]
 
--- | tail extracts the elements after the head of a list, which must be
--- non-empty.
-tail [x1,...,xn] = [x2,...,xn]
+------------------------------------
+-- accumulating maps
+------------------------------------
 
--- | take k, applied to a list xs, returns the prefix of xs of length k, or xs
--- itself is k >= length xs
-take k [x1,...,xn] = [x1, ..., xk]
+-- mapAccumL
 
--- | drop k xs returns the suffix of xs after the first k elements, or [] if
--- k >= length xs
-drop k [x1,...,xn] = [xk, ..., xn]
+-- mapAccumR
+
+------------------------------------
+-- infinite lists
+------------------------------------
+
+-- My language does not have infinite lists
+
+insertAt y k [x1, ..., xn] = [x1, ..., x{k}, y, x{k+1}, ..., xn]
+
+
+------------------------------------
+-- unfolding
+------------------------------------
+
+-- My language does not have unfolding (but it would be cool)
 
 ------------------------------------------------------------------------
 --
--- EXAMPLES
+-- Sublists
 --
 ------------------------------------------------------------------------
 
--- | inits returns all initial segments of the argument, shortest first.
-inits [x1,...,xn] = [[], [x1], [x1,x2], ..., [x1,x2,...,xn]]
--- or
-inits' [x1,...,xn] = [[], [x1], ..., [x1,...,xn]]
--- or
-inits'' [x1,...,xn] = [[], ..., [x1,...,xn]]
+------------------------------------
+-- Extracting sublists
+------------------------------------
 
--- | scanl1 is similar to foldl1, but returns a list of successive values
--- reduced from the left.
-scanl1 f [x1,...,xn] = [x1, foldl1 f [x1,x2], ..., foldl1 f [x1...xn]]
--- or
-scanl1 f [x1,...,xn] = [foldl1 f [x1], ..., foldl1 f [x1...xn]]
+take k [x1, ..., xn] = [x1, ..., xk]
 
--- | neighbors pairs adjacent elements of a list.
-neighbors [x1,...,xn] = [(x1, x2),...,(x{n-1},xn)]
+drop k [x1, ..., xn] = [xk, ..., xn]
 
--- | remove deletes the kth element from a list.
-remove k [x1,...,xn] = [x1, ..., x{k-1}, x{k+1}, ..., xn]
+splitAt k [x1, ..., xn] = ([x1, ..., xk], [x{k+1}, ..., xn])
 
--- | replace exchanges the kth element from a list with y.
-replace k y [x1,...,xn] = [x1, ..., x{k-1}, y, x{k+1}, ..., xn]
+-- takeWhile
 
--- | rotL cycles the list leftwards by k elements.
-rotL k [x1,...,xn] =
-    let k' = k `mod` n
-    in [x{k'+1},...,xn,x1,...,x{k'}]
+-- dropWhile
+
+-- dropWhileEnd
+
+-- span
+
+-- break
+
+stripPrefix [p1, ..., pk] [x1, ..., xn] =
+    if isPrefixOf [p1, ..., pk] [x1, ..., xn]
+    then [x{k+1}, ..., xn]
+    else error
+
+-- group
+
+-- groupBy
+
+initselli [x1, ..., xn] = [ [], [x1], ..., [x1, ..., xn]]
+
+-- tails [x1, ..., xn] = [ [x1, ..., xn], ..., [] ]
+
+------------------------------------------------------------------------
+--
+-- PREDICATES
+-- 
+------------------------------------------------------------------------
+
+isPrefixOf [p1, ..., pk] [x1, ..., xn] = [p1, ..., pk] == [x1, ..., xk]
+
+isSuffixOf [s1, ..., sk] [x1, ..., xn] = [s1, ..., sk] == [x{n-k+1}, ..., xn]
+
+isInfixOf [i1, ..., ik] [x1, ..., xn]
+    = if ( [i1, ..., ik] == [] )
+      then True
+      else ( ([i1, ..., ik] == [x1, ..., xk]) || ... || ([i1, ..., ik] == [x{n-k+1}, ..., xn]) || False )
+
+-- isSubsequenceOf
+
+------------------------------------------------------------------------
+--
+-- SEARCHING LISTS
+-- 
+------------------------------------------------------------------------
+
+------------------------------------
+-- searching by equality
+------------------------------------
+
+elem y [x1, ..., xn] = (y == x1) || ... || (y == xn) || False
+
+notElem y [x1, ..., xn] = (y /= x1) && ... && (y /= xn) && True
+
+{- Needs better patterns
+lookup yk [(k1, v1), ..., (kn, vn)] = 
+    case elemIndex1 yk [k1, ..., kn] of
+        Just i  -> Just vi
+        Nothing -> Nothing
+-}
+
+------------------------------------
+-- searching with a predicate
+------------------------------------
+
+-- find
+
+{- Needs the | operator
+filter p [x1, ..., xn] = [x1, ..., xn | p x]
+-}
+
+{- ditto
+partition p [x1, ..., xn] = ([x1, ..., xn | p x], [x1, ..., xn | not (p x)])
+-}
+
+------------------------------------------------------------------------
+--
+-- INDEXING LISTS
+-- 
+------------------------------------------------------------------------
+
+subscript1 [x1, ..., xn] k = xk
+
+subscript [x1, ..., xn] k = x{k+1}
+
+{- elemIndex1 y [x1, ..., xn] = headMaybe [1, ..., n | y == x]
+elemIndex1' y [x1, ..., xn] = headMaybe [... i ... | y == xi]
+-}
+
+{- elemIndices1 y [x1, ..., xn] = [1, ..., n | ... y == x ...]
+elemIndices1' y [x1, ..., xn] = [... i ... | ... y == xi ... ]
+-}
+
+{- findIndex1 p [x1, ..., xn] = headMaybe [1, ..., n | p x]
+findIndex1' p [x1, ..., xn] = headMaybe [... i ... | p xi]
+-}
+
+{- findIndices1 p [x1, ..., xn] = [1, ..., n | ... p x ...]
+findIndices1' p [x1, ..., xn] = [... i ... | ... p xi ...]
+findIndices1 p l =
+    let go = \l i -> case l of {
+        (x:xr)  -> if p x then i:(go xr (i+1)) else go xr (i+1)
+        []      -> []
+    }
+    in go l 1
+-}
+
+
+------------------------------------------------------------------------
+--
+-- ZIPPING AND UNZIPPING LISTS
+-- 
+------------------------------------------------------------------------
+
+zip [x1, ..., xn] [y1, ..., ym] = [(x1, y1), ..., (xn, ym)]
+
+-- ...
+
+zipWith f [x1, ..., xn] [y1, ..., ym] = [f x1 y1, ..., f xn ym]
+
+-- ...
+
+-- unzip
+
+-- ...
+
+------------------------------------------------------------------------
+--
+-- "SET" OPERATIONS
+--
+------------------------------------------------------------------------
+
+-- nub (see rdup)
+
+{- delete y [x1, ..., xn] = case k = findIndices1 y [x1, ..., xn] of {
+    k:xs    -> [x1, ..., x{k-1}, x{k+1}, ..., xn];
+    []      -> [x1, ..., xn];
+} -}
+    
+-- \\
+
+-- union
+
+-- intersect
+
+------------------------------------------------------------------------
+-- 
+-- ORDERED LISTS
+-- 
+------------------------------------------------------------------------
+
+-- sort
+
+-- sortOn
+
+-- insert
+
+
+
+------------------------------------------------------------------------
+--
+-- OTHERS FROM EXAMPLES.TXT
+--
+------------------------------------------------------------------------
+
+-- Success: map, fold, fac, cat, reverse, zip, zipWith, take, drop, 
+-- splitAt mapR, foldm, foldz, dotProduct, concatMap, intersperse, 
+-- all, and
+
+-- Failed: insert, lookup, rdup takeWhile, dropWhile, groupBy
+
+{- rdup would also need more advanced list patterns
+rdup [x1, ..., y, ..., y, ..., xn] = [x1, ..., y, ..., xn]
+-}
+
+fac n = n * ... * 1
+
+mapR f [x1, ..., xn] = [f xn, ..., f x1]
+
+foldm g f [x1, ..., xn] = (f x1) `g` ... `g` (f xn)
+
+foldz g [x1, ..., xn] [y1, ..., ym]
+    = (x1, y1) `g` ... `g` (xn, ym)
+
+dotProduct [x1, ..., xn] [y1, ..., ym]
+    = if n == m
+      then 0 + x1*y1 + ... + xn*yn
+      else error
+
+------------------------------------------------------------------------
+--
+-- OTHERS
+--
+------------------------------------------------------------------------
+
+neighbors [x1, ..., xn] = [(x1, x2), ..., (x{n-1}, xn)]
+
+remove k [x1, ..., xn] = [x1, ..., x{k-1}, x{k+1}, ..., xn]
+
+replace k y [x1, ..., xn] = [x1, ..., x{k-1}, y, x{k+1}, ..., xn]
+
+rotL k [x1, ..., xn] =
+    let kMod = k `mod` n
+    in [x{kMod + 1}, ..., xn, x1, ..., x{kMod}]
+
+combinations [x1, ..., xn] [y1, ..., ym] 
+    = [(x1, y1), ..., (xn, y1)] ++ ... ++ [(x1, ym), ..., (xn, ym)]
+
+\__1 __2 -> case __1 of {
+                i -> let k = length (i) in 
+                        case __2 of {
+                                x -> let n = length (x) in 
+                                        if map (\_i0 -> _i0) (slice (i) (1) (k)) == [] then true
+
+                                        else 
+                                            foldr 
+                                            (\x y -> x || y) 
+                                            (false)
+                                            (
+                                                zipWith3 
+                                                    (\_x3 _x2 _1 -> 
+                                                            zipWith4
+                                                                (\_i4 _x3 _x2 _1 -> _i4)
+                                                                (slice (i) (1) (k))
+                                                                (slice (x) (1) (n - k + 1))
+                                                                (slice (x) (k) (n))
+                                                                (range (k) (n)) == map (\_0 -> _0) (range (_x3) (_x2)))
+                                                    (slice (x) (1) (n - k + 1)) (slice (x) (k) (n)) (range (k) (n))
+                                            ); 
+                        }; 
+        }

@@ -1,20 +1,27 @@
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 module Main where
 
-import EllipLang.Examples
-import EllipLang.Pretty ( pp, ppVal )
-import EllipLang.Syntax
-import EllipLang.Eval
-import EllipLang.Translator
+import EllipLang
+import EllipLang.Parser (processFile)
+import EllipLang.MHSPrelude (prelude)
 
-{-
-favorites :: [(String, Expr)]
-favorites = [("binSearch", binSearch'), ("pairAdj", pairAdj'), ("rotL", rotL')]
+import System.Environment (getArgs)
+import System.IO
+import Data.Function ((&))
 
-printFavorites :: IO ()
-printFavorites = putStrLn $ foldl (\x y -> x++"\n\n"++y) "\nFavorite examples:" $ map (\(n, e) -> n ++ ": \n" ++ pp e) favorites
--}
+passedArgs = [ShowParse, ShowTranslate]
 
 main :: IO ()
-main = putStrLn $ pp $ translate inits'
--- main = putStrLn $ ppVal $ eval prelude $ combinations `App` exList `App` exList2
+main = do
+    args <- getArgs
+    case args of
+        []  -> repl passedArgs
+        [f] -> replFile f
+        _   -> error "weird args"
+
+replFile :: String -> IO ()
+replFile f = do
+    handle <- openFile f ReadMode
+    contents <- hGetContents handle
+    newEnv <- processFile contents & run True prelude
+    repl' passedArgs newEnv

@@ -236,9 +236,28 @@ listRange xs begin end =
         let end'   = (length xs) - end + 1
         in drop (begin' - 1) (take end' (reverse xs))
 
-myfoldr1 fn list =
-    let foldr1' = (\f list1 -> case list1 of
+myfoldr1 = \fn list ->
+    let myfoldr1' = (\f list1 -> case list1 of
         { [x]     -> x
-        ; (x:xs)  -> f x (foldr1' f xs)
-        ; []      -> error "foldr1: Empty list"})
-    in foldr1' fn list
+        ; (x:xs)  -> f x (myfoldr1' f xs)
+        ; []      -> error "foldr1: Empty list"
+        })
+    in myfoldr1' fn list
+
+
+myfoldl1 = \fn list ->
+    let myfoldl1' = (\f list1 -> case list1 of
+        { [x]       -> x
+        ; [x1,x2]   -> f x1 x2
+        ; (x1:x2:xs)-> f (f x1 x2) (myfoldl1 f xs)
+        ; []        -> error "foldl1: Empty list"
+        })
+    in myfoldl1' fn list
+
+inits' :: [a] -> [[a]]
+inits' xs = 
+    let go prev list = case list of {
+        []      -> [];
+        (x:xs)  -> let now = prev ++ [x] in now:go now xs;
+    }
+    in []:go [] xs

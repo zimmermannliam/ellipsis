@@ -1,6 +1,9 @@
 module Mytest where
 
-import Prelude ((+), (-), div, (*), mod, (>), (>=), (<), (<=), (==), (&&), (||), not, error, (++), map, reverse, take, drop, length, Int, ($), otherwise, zipWith, foldr1, zipWith3, foldl1, max, (!!))
+import Prelude ((+), (-), div, (*), mod, (>), (>=), (<), (<=), (==), (&&), (||), not, error, (++), map, reverse, take, drop, length, Int, ($), otherwise, zipWith, foldr1, zipWith3, foldl1, max, (!!), id)
+
+import Data.List (inits)
+
 listRange :: [a] -> Int -> Int -> [a] 
 listRange xs i j     | i < 1        = [] 
                  | j < 1        = [] 
@@ -41,10 +44,6 @@ rotL =
                                 map (\__x0 -> (__x0)) (listRange (xs) (k'+1) (n)) ++ map (\__x0 -> (__x0)) (listRange (xs) (1) (k')); 
         }))
 
-inits = \xs -> case xs of {
-                _ -> let n = length (xs) in 
-                        map (\__0 -> map (\__x0 -> __x0) (listRange (xs) (1) (__0))) ([1..n]); 
-        }
 inits' = \xs -> case xs of {
                 _ -> let n = length (xs) in 
                         map (\__0 -> map (\__x0 -> __x0) (listRange (xs) (1) (__0))) ([1..n]); 
@@ -95,4 +94,79 @@ scanl1'' = \f xs -> case xs of {
 sum = \xs -> case xs of {
         x -> let n = length (x) in
                 foldr1 (\a b -> a+b) (map (\_x0 -> _x0) (listRange (x) (1) (n)))
+        }
+
+initsAndAddEnumerate = \xs -> case xs of {
+                x -> let n = length (x) in 
+                        map (\_2 -> zipWith (\_x1 _0 -> _x1+_0) (listRange (x) (1) (_2)) (range (1) (_2))) (range (0) (foldr1 (max) ([n,n]))); 
+        }
+
+
+blah = \xs -> case xs of {
+                x -> let n = length (x) in 
+                        zipWith (\_2 _1 -> map (\_x0 -> _x0+_2) (listRange (x) (1) (_1))) (range (1) (n)) (range (1) (n)); 
+        }
+
+fun = \z -> case z of {
+                x -> let n = length (x) in 
+                        zipWith (\_3 _2 -> zipWith (\_x1 _0 -> _x1 + _0) (listRange (x) (1) (_3)) (range (1) (_2))) (range (5) (n)) (range (5) (n)); 
+        }
+
+fun2 = \z -> case z of {
+                x -> let n = length (x) in 
+                        zipWith3 (\_x2 _x1 _0 -> zipWith (\_1 _0 -> _1 + _0) (range (_x2) (_x1)) (range (1) (_0))) (listRange (x) (1) (1)) (listRange (x) (1) (n)) (range (1) (n)); 
+        }
+
+fun4 = \z -> case z of {
+                x -> let n = length (x) in 
+                        inits (zipWith (\_x1 _0 -> _x1 + _0) (listRange (x) (1) (n)) (range (1) (n)));
+        }
+fun6 = \z -> case z of {
+                x -> let n = length (x) in 
+                        zipWith3 (\_x2 _x1 _0 -> zipWith (\_1 _0 -> _1 + _0) (range (_x2) (_x1)) (range (1) (_0))) (listRange (x) (1) (1)) (listRange (x) (n) (n)) (range (1) (n)); 
+        }
+
+fun7 = \z -> case z of {
+                x -> let n = length (x) in 
+                        map (\_1 -> map (\_x0 -> _x0 + _1) (listRange (x) (1) (n))) (range (1) (n)); 
+        }
+
+fun8 = \z -> case z of {
+                x -> let n = length (x) in 
+                        zipWith3 (\_x2 _x1 _0 -> zipWith (\_1 _0 -> _1 + _0) (range (_x2) (_x1)) (range (1) (_0))) (listRange (x) (1) (1)) (listRange (x) (1) (n)) (range (1) (n)); 
+        }
+
+fun9 = \z -> case z of {
+                x -> let n = length (x) in 
+                        id (drop (1) (inits (zipWith (\_x1 _0 -> _x1 + _0) (listRange (x) (1) (n)) (range (1) (n))))); 
+        }
+
+fun10 = \f xs -> case xs of {
+                x -> let n = length (x) in 
+                        map (\_1 -> foldl1 (\x y -> x `f` y) (map (\_x0 -> _x0) (listRange (x) (1) (_1)))) (range (1) (n)); 
+        }
+
+fun11 = \f xs -> case xs of {
+                x -> let n = length (x) in 
+                        (++) ([(!!) (x) (1 - 1)]) (map (\_1 -> foldl1 (\x y -> x `f` y) (map (\_x0 -> _x0) (listRange (x) (1) (_1)))) (range (2) (n))); 
+        }
+
+fn12 = \f xs -> case xs of {
+                x -> let n = length (x) in 
+                        [(!!) (x) (1 - 1),(!!) (x) (1 - 1) `f` (!!) (x) (2 - 1),foldl1 (\x y -> x `f` y) (map (\_0 -> (!!) (x) (_0 - 1)) (range (1) (n)))]; 
+        }
+
+fun13 = \f xs -> case xs of {
+                x -> let n = length (x) in 
+                        (++) ([(!!) (x) (1 - 1)]) (map (\_1 -> foldl1 (\x y -> x `f` y) (map (\_x0 -> _x0) (listRange (x) (1) (_1)))) (range (2) (n))); 
+        }
+
+fun14 = \f xs -> case xs of {
+                x -> let n = length (x) in 
+                        (++) ([(!!) (x) (1 - 1),(!!) (x) (1 - 1) `f` (!!) (x) (2 - 1)]) (zipWith (\_x2 _1 -> _x2 `f` foldr1 (\x y -> x `f` y) (map (\_x0 -> _x0) (listRange (x) (2) (_1)))) (listRange (x) (1) (1)) (range (3) (n))); 
+        }
+
+fun15 = \f xs -> case xs of {
+                x -> let n = length (x) in 
+                        map (\_1 -> foldl1 (f) (map (\_x0 -> _x0) (listRange (x) (1) (_1)))) (range (1) (n)); 
         }

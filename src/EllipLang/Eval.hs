@@ -32,6 +32,8 @@ eval :: Env -> Expr -> Val
 eval e (Var vn) = evalBinding e (envLookup e vn)
 eval e (App t1 t2) = case eval e t1 of
     Closure x t1b e2 -> eval (Map.insert (NamedVar x) (BVal $ eval e t2) e2) t1b
+    FreeVar "div"   -> eval e $ Op Div t1 t2
+    FreeVar "mod"   -> eval e $ Op Mod t1 t2
     _           -> errorOut e $ "Expected fn (" ++ pp t1 ++ ") to be applied"
 eval e (Abstr x t) = Closure x t e
 
@@ -42,7 +44,7 @@ eval e (Case tc ps) = patternMatchEval e tc ps
 eval e (Let n t1 t2) = eval (Map.insert (NamedVar n) (BVal $ eval e t1) e) t2
 eval e (LetRec n t1 t2) = case eval e t1 of
     Closure {}  -> eval (Map.insert (NamedVar n) (BVal $ eval e $ App ycomb (Abstr n t1)) e) t2
-    _           -> errorOut e "Expected fn to be letrecced"
+    _           -> eval e (Let n t1 t2)
 
 -- Ellipsis/list operators
 eval e (ListElement n i) = findListFutureElement e (envLookup e n) i
@@ -393,7 +395,7 @@ patternMatchEval :: Env -> Expr -> Alts -> Val
 patternMatchEval e t (p:ps) = case patternMatch e t p of
                                 Nothing     -> patternMatchEval e t ps
                                 Just v      -> v
-patternMatchEval e t []     = error "Ran out of patterns"
+patternMatchEval e t []     = error $ "Ran out of patterns: " ++ show (eval e t)
 
 -- Match a single possibility vs Expr
 patternMatch :: Env -> Expr -> (Pattern, Expr) -> Maybe Val

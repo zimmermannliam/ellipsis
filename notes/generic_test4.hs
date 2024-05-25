@@ -39,3 +39,9 @@ mkMMMaybeT f x y =
             Just (res :: MaybeT m c) -> res
             _                        -> mzero
         _                                -> mzero
+
+data TestRip = R0 Int | R1 [Int] | R2 [[Int]] | R3 [[[Int]]]
+    deriving (Show, Data, Typeable)
+
+add1 :: Int -> Int
+add1 i = i+1

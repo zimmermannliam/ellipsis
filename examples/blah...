@@ -1,0 +1,20 @@
+let x = 5
+
+let y = 10
+
+let foldr1 = \f xs -> case xs of {
+    [x1, ..., xn] -> x1 `f` (... `f` xn);
+}
+
+let foldl = \fn base list -> 
+    let go = \f acc l -> case l of {
+    []      -> acc;
+    x:xs    -> go fn (fn acc x) xs;
+    }
+    in go fn base list
+
+let subchunks = \k xs -> case xs of {
+    [x1, ..., xn] -> 
+        let nmk = (n - k) in [ [x1, ..., xk], ..., [x{nmk}, ..., xn] ];
+}
+

@@ -6,6 +6,8 @@ module EllipLang.Parser where
 
 import EllipLang.Syntax
 import EllipLang.SmartCons (unConsSafe, cons)
+import EllipLang.MHSPrelude
+
 
 import Data.Text (Text)
 import Data.Void
@@ -18,13 +20,22 @@ import Control.Monad.Combinators.Expr
 import Text.Megaparsec.Debug (dbg)
 import Debug.Trace
 import Data.Data (gmapM)
-import Data.Generics (mkM, toConstr)
-import Data.List (maximumBy)
+import Data.Generics (mkM, everywhere', mkT)
+import Data.List (maximumBy, groupBy, isPrefixOf)
 import Data.List.Extra (uncons, unsnoc)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
+import Data.Function ((&))
 
 type Parser = Parsec Void Text
+
+processFile :: String -> [String]
+processFile s = s
+    & lines
+    & groupBy (\a b -> a /= "" && b /= "")  -- group empty lines
+    & fmap unwords
+    & filter (\x -> x /= "" && not (isPrefixOf "--" x) && not (isPrefixOf "{-" x))
+
 
 resw =
     [ "if", "then", "else"
@@ -34,8 +45,47 @@ resw =
     , "let", "in"
     ]
 
+pDecl :: Parser Expr
+pDecl = choice
+    [ try $ do
+        (var, pats) <- getDecl
+        innerExpr <- makeExprParser pTerm operatorTable
+        let expr = mkDecl var pats innerExpr
+        secondPass expr
+    , makeExprParser pTerm operatorTable >>= secondPass
+    ]
+
 pExpr :: Parser Expr
 pExpr = makeExprParser pTerm operatorTable >>= secondPass
+
+getDecl :: Parser (String, [Pattern])
+getDecl = do
+    ident   <- lexeme pIdent
+    pats    <- lexeme $ many pPattern
+    void $ lexeme $ string "="
+    return (ident, pats)
+
+mkDecl :: String -> [Pattern] -> Expr -> Expr
+mkDecl ident pats expr = 
+    Decl ident 
+    $ foldr mkAbstr id patNames
+    $ foldr mkCase id patNames
+    $ expr
+  where
+    patName :: Int -> Pattern -> (Pattern, String)
+    patName _ (PVar n)  = (PVar n, n)
+    patName x p         = (p, "__" ++ show x)
+
+    mkAbstr :: (Pattern, String) -> (Expr -> Expr) -> (Expr -> Expr)
+    mkAbstr (PVar n, _) abstr       = abstr . Abstr n
+    mkAbstr (_, s) abstr            = abstr . Abstr s
+
+    mkCase :: (Pattern, String) -> (Expr -> Expr) -> (Expr -> Expr)
+    mkCase (PVar n, _) c = c
+    mkCase (p, targ) c = \x -> c $ Case (Var targ) [(p, x)]
+
+    patNames = reverse $ zipWith patName [1..] pats
+
 
 ------------------------------------------------------------------------
 --
@@ -112,22 +162,29 @@ pCase = do
         return (pat, expr)
     
 pPattern :: Parser Pattern
-pPattern = choice
-    [ squareBrackets $ do -- PElli
-        begin <- try pListElement <|> pVar
-        void $ lexeme $ optional $ char ','
-        void $ lexeme $ string "..."
-        void $ lexeme $ optional $ char ','
-        end <- try pListElement <|> pVar
-        (var, idxl, idxr) <- extractListElement begin end
-        return $ PEllipsis var idxr
-    , do -- PVal
-        val <- pVal
-        return $ PVal val
-    , do -- PVar
-        ident <- pIdent
-        return $ PVar ident
-    ]
+pPattern = do
+    choice 
+        [ try $ do -- PCons
+            l <- pIdent
+            void $ lexeme $ string ":"
+            r <- pIdent
+            return $ PCons l r
+        , do -- PVal
+            val <- pVal
+            return $ PVal val
+        , do -- PVar
+            ident <- pIdent
+            return $ PVar ident
+        , squareBrackets $ do -- PElli
+            begin <- try pListElement <|> pVar
+            void $ lexeme $ optional $ char ','
+            void $ lexeme $ string "..."
+            void $ lexeme $ optional $ char ','
+            end <- try pListElement <|> pVar
+            (var, idxl, idxr) <- extractListElement begin end
+            return $ PEllipsis var idxr
+
+        ]
   where
     pVal :: Parser Val
     pVal = (lexeme . try) (pTerm >>= check)
@@ -171,7 +228,7 @@ pLet = do
     e1 <- pExpr
     void $ lexeme $ symbol "in"
     e2 <- pExpr
-    return $ Let v e1 e2
+    return $ LetRec v e1 e2
 
 
 
@@ -296,9 +353,10 @@ operatorTable =
       , binaryL "`mod`" (opToBinExpr "`mod`")
       ] -- 7
     , [ binaryL "-" (opToBinExpr "-")
-      , binaryL "+" (opToBinExpr "+")
+      , InfixL $ Op Add <$ try (symbol "+" >> notFollowedBy (symbol "+"))
       ] -- 6
     , [ binaryR ":" (opToBinExpr ":")
+      , binaryR "++" (Op $ VarOp $ unVar catFun)
       ] -- 5
     , [ binaryN "==" (opToBinExpr "==")
       , binaryN "/=" (opToBinExpr "/=")
@@ -330,11 +388,10 @@ operatorTable =
         return $ Op (VarOp f)
     
     ifxExpr :: Parser String
-    ifxExpr = lexeme $ between (char '`') (char '`') (pIdent)
+    ifxExpr = lexeme $ between (char '`') (char '`') pIdent
 
-
-app :: Operator Parser Expr
-app = InfixL (App <$ (symbol "" <?> "application"))
+    app :: Operator Parser Expr
+    app = InfixL (App <$ (symbol "" <?> "application"))
 
 
 ------------------------------------------------------------------------
@@ -361,7 +418,7 @@ symbol = L.symbol sc
 ------------------------------------------------------------------------
 
 secondPass :: Expr -> Parser Expr
-secondPass t = unsugarElements [] t >>= elliTokenToExpr
+secondPass t = elliTokenToExpr <$> unsugarElements [] t
 
 -- | Note: bad case:
 -- [y1 ... yn] -> yourHouse
@@ -371,7 +428,8 @@ secondPass t = unsugarElements [] t >>= elliTokenToExpr
 unsugarElements :: [String] -> Expr -> Parser Expr
 unsugarElements cxt (Case target alts) = do
     rhs <- mapM (\case { (PEllipsis n _, t) -> unsugarElements (n:cxt) t; (_, t) -> unsugarElements cxt t; }) alts
-    return $ Case target (zip (fmap fst alts) rhs)
+    target' <- unsugarElements cxt target
+    return $ Case target' (zip (fmap fst alts) rhs)
 unsugarElements cxt (Var v) = 
     let spans = fmap (spanSharedPrefix v) ("":cxt)
     in case maximumBy (\(nl, _, _ ) (nr, _, _) -> compare (length nl) (length nr)) spans of
@@ -382,11 +440,32 @@ unsugarElements cxt (Var v) =
         (_, _, _)       -> return (Var v)   -- v does not contain all of the cxt variable
 unsugarElements cxt t = gmapM (mkM (unsugarElements cxt)) t
 
-elliTokenToExpr :: Expr -> Parser Expr
-elliTokenToExpr xs@(Cons _ _) = case unConsSafe xs of
-    Just xs' ->  return $ foldr1 (App . App (Var "(++)")) (cons <$> preElliToElliList xs')
-    Nothing -> fail "second pass: list could not be uncons'd properly"
+elliTokenToExpr :: Expr -> Expr
+elliTokenToExpr = everywhere' (mkT go)
   where
+    go :: Expr -> Expr
+    go consList@(Cons _ _) = case unConsSafe consList of
+        Just xs -> foldr1 (App . App (catFun)) (cons <$> preElliToElliList xs)
+        Nothing -> consList
+
+    go e@(Op op1 l (Op op2 PreElli r))
+        | (op1 == op2) = case r of
+            (Op op3 r' z)   -> if (op3 == op1) 
+                               then ElliFoldr0 l r' z op1
+                               else ElliFoldr l r op1
+            _               -> ElliFoldr l r op1
+        | otherwise = e
+
+    go e@(Op op1 (Op op2 l PreElli) r)
+        | (op1 == op2) = case l of
+            (Op op3 z l')   -> if (op3 == op1)
+                               then ElliFoldl0 l' r z op1
+                               else ElliFoldl l r op1
+            _               -> ElliFoldl l r op1
+        | otherwise = e
+
+    go e = e
+
     preElliToElliList :: [Expr] -> [[Expr]]
     preElliToElliList (l:PreElli:r:xs) = [l `Ellipsis` r]:preElliToElliList xs
     preElliToElliList (x:l:PreElli:xs) = [x]:preElliToElliList (l:PreElli:xs)
@@ -396,12 +475,6 @@ elliTokenToExpr xs@(Cons _ _) = case unConsSafe xs of
             Just (mySubList, rest) -> (x:mySubList):rest
             Nothing -> [x]:xs'
     preElliToElliList []               = []
-elliTokenToExpr (Op o1 (Op o2 l PreElli) r) | o1 == o2 = return $ ElliFoldl l r o1
-                                            | otherwise = fail "Bad"
-elliTokenToExpr (Op o1 l (Op o2 PreElli r)) | o1 == o2 = return $ ElliFoldr l r o1
-                                            | otherwise = fail "Bad"
-elliTokenToExpr t = gmapM (mkM elliTokenToExpr) t
-
 
 ------------------------------------------------------------------------
 --

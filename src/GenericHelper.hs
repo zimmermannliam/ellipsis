@@ -10,7 +10,7 @@
 module GenericHelper where
 
 import Data.Generics (Data, Typeable, GenericT, GenericQ, GenericM, gzipWithM, toConstr, cast, gmapT, gmapQ, gzipWithQ
-    , everything, mkQ, gshow)
+    , everything, mkQ, gshow, gmapM)
 import Control.Monad.Trans.Maybe
 import Control.Monad (mzero, guard)
 import Control.Monad.Trans (lift)
@@ -26,6 +26,22 @@ everywhereUntil q f = go
     go x
         | q x       = f x
         | otherwise = f (gmapT go x)
+    
+everywhereUntilM :: forall m. Monad m => GenericQ Bool -> GenericM m -> GenericM m
+everywhereUntilM q f = go
+  where
+    go :: GenericM m
+    go x
+        | q x  = f x
+        | otherwise = do
+            x' <- f x
+            gmapM go x'
+
+everywhereM' :: forall m. Monad m => GenericM m -> GenericM m
+everywhereM' f = go
+  where
+    go :: GenericM m
+    go x = f x >>= gmapM go
 
 gzipM :: (Monad m, Typeable m)
     => GenericQ (GenericM (MaybeT m)) -> GenericQ (GenericM (MaybeT m))

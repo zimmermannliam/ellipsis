@@ -1,0 +1,216 @@
+let error = \err -> err errzzzzz
+
+
+
+
+let add = \a b -> a+b
+
+let sub = \a b -> a-b
+
+let succ = \a -> a+1
+
+let negate = \a -> 0 - a
+
+let max = \a b -> if a > b then a else b
+
+let min = \a b -> if a < b then a else b
+
+let abs = \a -> (a * a) `div` a
+
+let cat = \list1 list2 -> 
+    let go = \xs ys -> case xs of {
+        []      -> ys;
+        x:xr    -> x:(go xr ys);
+    }
+    in go list1 list2
+
+let length = \xs ->
+    let go = \xs -> case xs of {
+        []      -> 0;
+        x:xr    -> 1 + go xr;
+    }
+    in go xs
+
+let reverse = \xs ->
+    let go = \xs -> case xs of {
+        []      -> [];
+        x:xr    -> cat (go xr) [x];
+    }
+    in go xs
+
+
+
+
+
+
+let drop = \k xs ->
+    let go = \k xs -> case xs of {
+        []      -> [];
+        x:xr    -> 
+            if k == 0
+            then xs
+            else go (k-1) xr;
+    }
+    in go k xs
+
+let take = \k xs ->
+    let go = \k xs -> 
+        if k == 0 
+        then []
+        else case xs of {
+            []      -> [];
+            x:xr    -> x:(go (k-1) xr);
+        }
+    in go k xs
+
+let first = \xs ->
+    let go = \xs -> case xs of {
+        []      -> error 100;
+        x:xr    -> 
+            if xr == []
+            then []
+            else x:(go xr);
+    }
+    in go xs
+
+let tail = \xs -> case xs of {
+    []  -> error 100;
+    x:xs -> xs;
+}
+
+let last = \xs ->
+    let go = \xs -> case xs of {
+        []      -> error 100;
+        x:xr    -> 
+            if xr == [] 
+            then x 
+            else go xr;
+    }
+    in go xs
+
+let head = \xs -> case xs of {
+    []  -> error 100;
+    x:xs -> x;
+}
+
+let subscript = \xs k -> 
+    let go = \xs k -> 
+        if k == 0
+        then head xs
+        else go (tail xs) (k-1)
+    in go xs k
+
+
+
+
+
+
+let foldr = \f acc xs ->
+    let go = \f acc xs -> case xs of {
+        []      -> acc;
+        x:xs    -> f x (go f acc xs);
+    }
+    in go f acc xs
+
+let foldl = \f acc xs ->
+    let go = \f acc xs -> case xs of {
+        []      -> acc;
+        x:xs    -> go f (f acc x) xs;
+    }
+    in go f acc xs
+
+let foldl1 = \f xs -> foldl f (head xs) (tail xs)
+
+let foldr1 = \f xs -> foldr f (last xs) (first xs)
+
+
+
+
+
+
+let slice = \xs begin end ->
+    if begin < 1                then []
+    else if begin > length xs   then []
+    else if end < 1             then []
+    else if begin < end || begin == end then drop (begin - 1) (take end xs)
+    else
+        let beginP  = (length xs) - begin + 1 in
+        let endP    = (length xs) - end + 1
+        in drop (beginP - 1) (take endP reverse xs)
+
+let range = \begin end ->
+    let go = \begin end ->
+        if begin == end         then [begin]
+        else if begin < end     then begin:(go (begin+1) end)
+        else                         begin:(go (begin-1) end)
+    in go begin end
+
+
+
+
+let id = \x -> x
+
+let map = \f xs ->
+    let go = \xs -> case xs of {
+        []      -> [];
+        x:xr    -> (f x):(go xr);
+    }
+    in go xs
+
+let zipWith = \f xs ys ->
+    let go = \xs ys -> case xs of {
+        []      -> [];
+        x:xr  -> case ys of {
+            []      -> [];
+            y:yr  -> (f x y):(go xr yr);
+        };
+    }
+    in go xs ys
+
+let zipWith3 = \f xs ys zs ->
+    let go = \xs ys zs -> case xs of {
+        []      -> [];
+        x:xr  -> case ys of {
+            []      -> [];
+            y:yr  -> case zs of {
+                []      -> [];
+                z:zr    -> (f x y z):(go xr yr zr);
+            };
+        };
+    }
+    in go xs ys zs
+
+let zipWith4 = \f xs ys zs ws ->
+    let go = \xs ys zs ws -> case xs of {
+        []      -> [];
+        x:xr  -> case ys of {
+            []      -> [];
+            y:yr  -> case zs of {
+                []      -> [];
+                z:zr    -> case ws of {
+                    []      -> [];
+                    w:wr    -> (f x y z w):(go xr yr zr wr);
+                };
+            };
+        };
+    }
+    in go xs ys zs ws
+
+let zipWith5 = \f xs ys zs ws vs ->
+    let go = \xs ys zs ws vs -> case xs of {
+        []      -> [];
+        x:xr  -> case ys of {
+            []      -> [];
+            y:yr  -> case zs of {
+                []      -> [];
+                z:zr    -> case ws of {
+                    []      -> [];
+                    w:wr    -> case vs of {
+                        []      -> [];
+                        v:vr    -> (f x y z w v):(go xr yr zr wr vr);
+                    };
+                };
+            };
+        };
+    }
+    in go xs ys zs ws vs

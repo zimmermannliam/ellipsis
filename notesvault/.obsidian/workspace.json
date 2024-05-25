@@ -25,7 +25,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "daily/2024-05-14.md",
+                "file": "daily/2024-05-20.md",
                 "mode": "source",
                 "source": false
               }
@@ -110,7 +110,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "daily/2024-05-14.md",
+                "file": "daily/2024-05-20.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -127,7 +127,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "daily/2024-05-14.md",
+                "file": "daily/2024-05-20.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -150,7 +150,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "daily/2024-05-14.md"
+                "file": "daily/2024-05-20.md"
               }
             }
           }
@@ -173,30 +173,31 @@
   },
   "active": "6630e11fc0d456b4",
   "lastOpenFiles": [
+    "Favorites.md",
+    "Meeting 2024-04-22.md",
+    "daily/2024-04-05.md",
+    "daily/2024-04-14.md",
+    "daily/2024-04-19.md",
+    "daily/2024-05-14.md",
+    "daily/2024-05-20.md",
     "Pasted image 20240514111153.png",
     "daily/2024-05-09.md",
-    "daily/2024-05-14.md",
     "daily/2024-05-13.md",
     "daily/2024-05-06.md",
     "Todo.md",
     "daily/2024-05-01.md",
     "daily/2024-04-26.md",
-    "Meeting 2024-04-22.md",
     "Meeting 2024-4ish.md",
     "daily/2024-04-25.md",
     "daily/2024-04-24.md",
     "daily/2024-04-22.md",
     "Combinations.canvas",
-    "daily/2024-04-19.md",
     "Untitled",
     "daily/2024-04-17.md",
     "daily/2024-04-16.md",
-    "daily/2024-04-14.md",
-    "Favorites.md",
     "daily/2024-04-11.md",
     "daily/2024-04-09.md",
     "Untitled.md",
-    "daily/2024-04-05.md",
     "daily/2024-04-08.md",
     "daily/template.md",
     "Parser.md",

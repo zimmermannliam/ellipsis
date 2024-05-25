@@ -42,8 +42,8 @@ pp' tabs (LetRec  n e1 e2)    = "let " ++ n ++ " = " ++ pp' tabs e1 ++ pNewline 
 pp' tabs t@(Cons _ _)         = "[" ++ ppList tabs t ++ "]"
 pp' tabs (Pair t1 t2) = "(" ++ pp' tabs t1 ++ ", " ++ pp' tabs t2 ++ ")"
 pp' tabs (Cat t1 t2) = pp' tabs t1 ++ " ++ " ++ pp' tabs t2
-pp' tabs (ListElement n (Var i))    = n ++ i
-pp' tabs (ListElement n (Value (Con i)))    = n ++ show i
+-- pp' tabs (ListElement n (Var i))    = n ++ i
+-- pp' tabs (ListElement n (Value (Con i)))    = n ++ show i
 pp' tabs (ListElement n i)    = n ++ "{" ++ ppIdx i ++ "}"
 pp' tabs (Op op e1 e2)        = pp' tabs e1 ++ " " ++ ppOp op ++ " " ++ pp' tabs e2 
 pp' tabs (Abs t)              = "|" ++ pp' tabs t ++ "|"
@@ -58,10 +58,14 @@ pp' tabs (ElliFoldr t1 t2 op)
     = pp' tabs t1 ++ " " ++ ppOp op ++ " (... " ++ ppOp op ++ " " ++ pp' tabs t2 ++ ")"
 pp' tabs (ElliFoldl t1 t2 op) 
     = "(" ++ pp' tabs t1 ++ " " ++ ppOp op ++ " ...) " ++ ppOp op ++ " "++ pp' tabs t2
+pp' tabs (ElliFoldl0 t1 t2 z op)
+    = "((" ++ pp' tabs z ++ " " ++ ppOp op ++ " " ++ pp' tabs t1 ++ ") " ++ ppOp op ++ " ...) " ++ ppOp op ++ " " ++ pp' tabs t2
+pp' tabs (ElliFoldr0 t1 t2 z op)
+    = pp' tabs t1 ++ " " ++ ppOp op ++ " (" ++ pp' tabs t1 ++ " " ++ ppOp op ++ " (... " ++ ppOp op ++ " " ++ pp' tabs t2 ++ "))"
 pp' tabs (ER r)             = makeElliAlias r
 pp' tabs (Btwn t1 t2) = "[" ++ pp' tabs t1 ++ ".." ++ pp' tabs t2 ++ "]"
 pp' tabs (ElliGroup t) = "[" ++ pp' tabs t ++ "]"
--- pp' tabs _            = "Error -- cannot display expression"
+pp' tabs t            = "!!!!!!!!!!!"  ++ show t ++ "!!!!!!!!!!!"
 
 ppOp :: IfxOp -> String
 ppOp Add    = "+"
