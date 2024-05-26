@@ -395,7 +395,7 @@ patternMatchEval :: Env -> Expr -> Alts -> Val
 patternMatchEval e t (p:ps) = case patternMatch e t p of
                                 Nothing     -> patternMatchEval e t ps
                                 Just v      -> v
-patternMatchEval e t []     = error $ "Ran out of patterns: " ++ show (eval e t)
+patternMatchEval e t []     = error $ "Ran out of patterns"
 
 -- Match a single possibility vs Expr
 patternMatch :: Env -> Expr -> (Pattern, Expr) -> Maybe Val

@@ -73,7 +73,7 @@ mod' = Op Mod
 
 data ElliRange = ElliRange {ed_id::Id, ed_t::ElliType, ed_ib::Expr, ed_ie::Expr}
     deriving (Eq, Show, Data, Typeable)
-data ElliType = ElliList Name | ElliCounter
+data ElliType = ElliList Name | ElliCounter | ElliExpr Expr
     deriving (Eq, Show, Data, Typeable)
 
 data Val    = Con Int 

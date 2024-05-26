@@ -1,3 +1,5 @@
+
+
 ------------------------------------------------------------------------
 -- 
 -- BASIC FUNCTIONS
@@ -164,11 +166,13 @@ splitAt k [x1, ..., xn] = ([x1, ..., xk], [x{k+1}, ..., xn])
 -- break
 
 stripPrefix [p1, ..., pk] [x1, ..., xn] =
-    if isPrefixOf [p1, ..., pk] [x1, ..., xn]
+    if [p1, ..., pk] == [x1, ..., xk]
     then [x{k+1}, ..., xn]
     else error
 
 -- group
+
+group [x1, ..., xn] = []
 
 -- groupBy
 
@@ -187,9 +191,13 @@ isPrefixOf [p1, ..., pk] [x1, ..., xn] = [p1, ..., pk] == [x1, ..., xk]
 isSuffixOf [s1, ..., sk] [x1, ..., xn] = [s1, ..., sk] == [x{n-k+1}, ..., xn]
 
 isInfixOf [i1, ..., ik] [x1, ..., xn]
-    = if ( [i1, ..., ik] == [] )
-      then True
-      else ( ([i1, ..., ik] == [x1, ..., xk]) || ... || ([i1, ..., ik] == [x{n-k+1}, ..., xn]) || False )
+    = ([i1, ..., ik] == [x1, ..., xk]) || ... || ([i1, ..., ik] == [x{n-k+1}, ..., xn]) || False
+
+oror a b = a || b
+
+isInfixOf2 [i1, ..., ik] [x1, ..., xn] = foldr oror False (
+    from [i1, ..., ik] == [x1, ..., xk]
+    to   [i1, ..., ik] == [x{n-k+1}, ..., xn])
 
 -- isSubsequenceOf
 
@@ -220,9 +228,13 @@ lookup yk [(k1, v1), ..., (kn, vn)] =
 
 -- find
 
-{- Needs the | operator
-filter p [x1, ..., xn] = [x1, ..., xn | p x]
--}
+myfilter p [x1, ..., xn] 
+    = (if p x1 then [x1] else []) ++ ... ++ (if p xn then [xn] else []) ++ []
+
+myfilter2 p [x1, ..., xn] = foldr cat [] $
+    from if p x1 then [x1] else []
+    to   if p xn then [xn] else []
+
 
 {- ditto
 partition p [x1, ..., xn] = ([x1, ..., xn | p x], [x1, ..., xn | not (p x)])
@@ -238,27 +250,19 @@ subscript1 [x1, ..., xn] k = xk
 
 subscript [x1, ..., xn] k = x{k+1}
 
-{- elemIndex1 y [x1, ..., xn] = headMaybe [1, ..., n | y == x]
-elemIndex1' y [x1, ..., xn] = headMaybe [... i ... | y == xi]
--}
+elemIndices1 y [x1, ..., xn]
+    = [if y == x1 then [1] else []] ++ ... ++ [if y == xn then [n] else []] ++ []
 
-{- elemIndices1 y [x1, ..., xn] = [1, ..., n | ... y == x ...]
-elemIndices1' y [x1, ..., xn] = [... i ... | ... y == xi ... ]
--}
+elemIndices2 y [x1, ..., xn] = foldr cat [] $
+    from if y == x1 then [1] else []
+    to   if y == xn then [n] else []
 
-{- findIndex1 p [x1, ..., xn] = headMaybe [1, ..., n | p x]
-findIndex1' p [x1, ..., xn] = headMaybe [... i ... | p xi]
--}
+findIndices1 p [x1, ..., xn] = [if p x1 then [1] else []] ++ ... ++ [if p xn then [n] else []]
 
-{- findIndices1 p [x1, ..., xn] = [1, ..., n | ... p x ...]
-findIndices1' p [x1, ..., xn] = [... i ... | ... p xi ...]
-findIndices1 p l =
-    let go = \l i -> case l of {
-        (x:xr)  -> if p x then i:(go xr (i+1)) else go xr (i+1)
-        []      -> []
-    }
-    in go l 1
--}
+findIndices2 p [x1, ..., xn] = foldr cat [] $
+    from if p x1 then [1] else []
+    to   if p xn then [n] else []
+
 
 
 ------------------------------------------------------------------------
@@ -285,7 +289,9 @@ zipWith f [x1, ..., xn] [y1, ..., ym] = [f x1 y1, ..., f xn ym]
 --
 ------------------------------------------------------------------------
 
--- nub (see rdup)
+nub [x1, ..., xn] = foldr cat [] (
+    from if x1 `elem` []                then [] else [x1]
+    to   if xn `elem` [x1, ..., x{n-1}] then [] else [xn])
 
 {- delete y [x1, ..., xn] = case k = findIndices1 y [x1, ..., xn] of {
     k:xs    -> [x1, ..., x{k-1}, x{k+1}, ..., xn];
@@ -320,9 +326,9 @@ zipWith f [x1, ..., xn] [y1, ..., ym] = [f x1 y1, ..., f xn ym]
 
 -- Success: map, fold, fac, cat, reverse, zip, zipWith, take, drop, 
 -- splitAt mapR, foldm, foldz, dotProduct, concatMap, intersperse, 
--- all, and
+-- all, and, rdup (see nub)
 
--- Failed: insert, lookup, rdup takeWhile, dropWhile, groupBy
+-- Failed: insert, lookup, takeWhile, dropWhile, groupBy
 
 {- rdup would also need more advanced list patterns
 rdup [x1, ..., y, ..., y, ..., xn] = [x1, ..., y, ..., xn]
@@ -359,28 +365,15 @@ rotL k [x1, ..., xn] =
     in [x{kMod + 1}, ..., xn, x1, ..., x{kMod}]
 
 combinations [x1, ..., xn] [y1, ..., ym] 
-    = [(x1, y1), ..., (xn, y1)] ++ ... ++ [(x1, ym), ..., (xn, ym)]
+    = [(x1, y1), ..., (xn, y1)] ++ ... ++ [(x1, ym), ..., (xn, ym)] ++ []
 
-\__1 __2 -> case __1 of {
-                i -> let k = length (i) in 
-                        case __2 of {
-                                x -> let n = length (x) in 
-                                        if map (\_i0 -> _i0) (slice (i) (1) (k)) == [] then true
 
-                                        else 
-                                            foldr 
-                                            (\x y -> x || y) 
-                                            (false)
-                                            (
-                                                zipWith3 
-                                                    (\_x3 _x2 _1 -> 
-                                                            zipWith4
-                                                                (\_i4 _x3 _x2 _1 -> _i4)
-                                                                (slice (i) (1) (k))
-                                                                (slice (x) (1) (n - k + 1))
-                                                                (slice (x) (k) (n))
-                                                                (range (k) (n)) == map (\_0 -> _0) (range (_x3) (_x2)))
-                                                    (slice (x) (1) (n - k + 1)) (slice (x) (k) (n)) (range (k) (n))
-                                            ); 
-                        }; 
-        }
+count e [x1, ..., xn] = 0 + (if x1 == e then 1 else 0) + ... + (if xn == e then 1 else 0)
+
+sublistOccurs [y1, ..., yk] [x1, ..., xn] = count True (
+    from [y1, ..., yk] == [x1, ..., xk]
+    to   [y1, ..., yk] == [x{n-k+1}, ..., xn])
+
+isEven x = (x `mod` 2) == 0
+
+isOdd x = (x `mod` 2) == 1

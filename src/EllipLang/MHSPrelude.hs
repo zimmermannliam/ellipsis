@@ -28,11 +28,13 @@ subscriptFun    = Var "subscript"
 catFun          = Var "cat"
 foldr1Fun       = Var "foldr1"
 foldl1Fun       = Var "foldl1"
+appFun          = Var "app"
 
 
 -- PREPRELUDE IS GENERATED FROM THE FILE "prelude..."
 prePrelude =
     [ ("error", Abstr "err" (Var "err"))
+    , ("app", Abstr "f" (Abstr "x" (App (Var "f") (Var "x"))))
     , ("add", Abstr "a" (Abstr "b" (Op Add (Var "a") (Var "b"))))
     , ("sub", Abstr "a" (Abstr "b" (Op Sub (Var "a") (Var "b"))))
     , ("succ", Abstr "a" (Op Add (Var "a") (Value (Con 1))))
@@ -62,4 +64,5 @@ prePrelude =
     , ("zipWith3", Abstr "f" (Abstr "xs" (Abstr "ys" (Abstr "zs" (LetRec "go" (Abstr "xs" (Abstr "ys" (Abstr "zs" (Case (Var "xs") [(PVal Empty,Value Empty),(PCons "x" "xr",Case (Var "ys") [(PVal Empty,Value Empty),(PCons "y" "yr",Case (Var "zs") [(PVal Empty,Value Empty),(PCons "z" "zr",Cons (App (App (App (Var "f") (Var "x")) (Var "y")) (Var "z")) (App (App (App (Var "go") (Var "xr")) (Var "yr")) (Var "zr")))])])])))) (App (App (App (Var "go") (Var "xs")) (Var "ys")) (Var "zs")))))))
     , ("zipWith4", Abstr "f" (Abstr "xs" (Abstr "ys" (Abstr "zs" (Abstr "ws" (LetRec "go" (Abstr "xs" (Abstr "ys" (Abstr "zs" (Abstr "ws" (Case (Var "xs") [(PVal Empty,Value Empty),(PCons "x" "xr",Case (Var "ys") [(PVal Empty,Value Empty),(PCons "y" "yr",Case (Var "zs") [(PVal Empty,Value Empty),(PCons "z" "zr",Case (Var "ws") [(PVal Empty,Value Empty),(PCons "w" "wr",Cons (App (App (App (App (Var "f") (Var "x")) (Var "y")) (Var "z")) (Var "w")) (App (App (App (App (Var "go") (Var "xr")) (Var "yr")) (Var "zr")) (Var "wr")))])])])]))))) (App (App (App (App (Var "go") (Var "xs")) (Var "ys")) (Var "zs")) (Var "ws"))))))))
     , ("zipWith5", Abstr "f" (Abstr "xs" (Abstr "ys" (Abstr "zs" (Abstr "ws" (Abstr "vs" (LetRec "go" (Abstr "xs" (Abstr "ys" (Abstr "zs" (Abstr "ws" (Abstr "vs" (Case (Var "xs") [(PVal Empty,Value Empty),(PCons "x" "xr",Case (Var "ys") [(PVal Empty,Value Empty),(PCons "y" "yr",Case (Var "zs") [(PVal Empty,Value Empty),(PCons "z" "zr",Case (Var "ws") [(PVal Empty,Value Empty),(PCons "w" "wr",Case (Var "vs") [(PVal Empty,Value Empty),(PCons "v" "vr",Cons (App (App (App (App (App (Var "f") (Var "x")) (Var "y")) (Var "z")) (Var "w")) (Var "v")) (App (App (App (App (App (Var "go") (Var "xr")) (Var "yr")) (Var "zr")) (Var "wr")) (Var "vr")))])])])])])))))) (App (App (App (App (App (Var "go") (Var "xs")) (Var "ys")) (Var "zs")) (Var "ws")) (Var "vs"))))))))) 
+    , ("inits", Abstr "list" (LetRec "go" (Abstr "ys" (Abstr "xs" (Case (Var "xs") [(PVal Empty,Cons (Var "ys") (Value Empty)),(PCons "x" "xr",Cons (Var "ys") (App (App (Var "go") (Op (VarOp "cat") (Var "ys") (Cons (Var "x") (Value Empty)))) (Var "xr")))]))) (App (App (Var "go") (Value Empty)) (Var "list"))))
     ]

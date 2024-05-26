@@ -43,6 +43,7 @@ resw =
     , "case", "of"
     , "...", ".", ".."
     , "let", "in"
+    , "from", "to"
     ]
 
 pDecl :: Parser Expr
@@ -101,6 +102,7 @@ pTerm = choice
     , pIfThenElse
     , pCase
     , pLet
+    , pFrom
     , pBool
     , pInt
     , pListSugar
@@ -230,7 +232,13 @@ pLet = do
     e2 <- pExpr
     return $ LetRec v e1 e2
 
-
+pFrom :: Parser Expr
+pFrom = do
+    void $ lexeme $ symbol "from"
+    el <- pExpr
+    void $ lexeme $ symbol "to"
+    er <- pExpr
+    return $ Ellipsis el er
 
 pBool :: Parser Expr
 pBool = lexeme ((Value (Boolean True)  <$ string "True")
@@ -315,6 +323,7 @@ opToFixity s = fromMaybe FixLeft (fixmap Map.!? s)
         , (">=",        FixLeft)
         , ("&&",        FixRight)
         , ("||",        FixRight)
+        , ("$",         FixRight)
         ]
 
 opmap = Map.fromList
@@ -370,7 +379,7 @@ operatorTable =
     , [ binaryR "||" (opToBinExpr "||")
       ] -- 2
     , [ ] -- 1
-    , [] -- 0
+    , [ binaryR "$" (Op $ VarOp $ unVar appFun)] -- 0
     ]
   where
     binaryL :: Text -> (Expr -> Expr -> Expr) -> Operator Parser Expr
@@ -383,9 +392,13 @@ operatorTable =
     binaryN name f = InfixN (f <$ symbol name)
 
     ifx :: Parser (Expr -> Expr -> Expr)
-    ifx = do
+    ifx = try $ do
         f <- ifxExpr
-        return $ Op (VarOp f)
+        if f `elem` takenOps
+            then fail $ "Tried to parse a taken operator: " ++ show takenOps
+            else return $ Op (VarOp f)
+      where
+        takenOps = ["mod", "div"]
     
     ifxExpr :: Parser String
     ifxExpr = lexeme $ between (char '`') (char '`') pIdent

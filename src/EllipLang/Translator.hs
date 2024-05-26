@@ -134,6 +134,7 @@ tElliOuter transformedTree = do
     makeRange :: ElliRange -> Expr
     makeRange ElliRange {ed_t=ElliList n, ed_ib=ib, ed_ie=ie} = Var "slice" `App` Var n `App` ib `App` ie
     makeRange ElliRange {ed_t=ElliCounter, ed_ib=ib, ed_ie=ie} = Var "range" `App` ib `App` ie
+    makeRange ElliRange {ed_t=ElliExpr t} = t
 
 tInterpolate :: Expr -> Expr -> MaybeT (State ElliState) Expr
 tInterpolate b e = gzipM (mkMMMaybeT tInterpolateGo) b e
@@ -161,8 +162,8 @@ tInterpolateGo (Ellipsis ll lr) (Ellipsis rl rr) = do
     s@(id,rs) <- lift get
     -- These computations are contained and do not affect state, other than
     -- increasing the id for the purpose of disambiguation.
-    let (l, (idl, _)) = runState (runMaybeT $ tElliExpr' ll lr) s
-    let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' rl rr) s
+    let (l, (idl, _)) = runState (runMaybeT $ tElliExpr' ll lr) (id,[])
+    let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' rl rr) (id,[])
     l' <- hoistMaybe l
     r' <- hoistMaybe r
     guard $ trace (pp l' ++ "\n" ++ pp r') idl == idr  -- Just quickly check the state
@@ -217,15 +218,20 @@ tInterpolateGo (ElliGroup l) (ElliGroup r) = do
 -- [] ... [x1 ... xn]
 tInterpolateGo (Value Empty) (Ellipsis rl rr) = do
     s@(id,rs) <- lift get
-    let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' rl rr) s
+    let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' rl rr) (id,[])
     r' <- hoistMaybe r
-    lift $ put (id+idr, rs)
-    return $ Var "inits" `App` r'
+    let newRange = ElliRange { ed_t = ElliExpr $ Var "inits" `App` r'
+                             , ed_ie = Value (Con 0)
+                             , ed_ib = Value (Con 0)
+                             , ed_id = id+idr+1
+                             }
+    lift $ put (id+idr+1, newRange:rs)
+    return $ Var $ makeElliAlias newRange
 
 -- [x1...xn] ... []
 tInterpolateGo (Ellipsis ll lr) (Value Empty) = do
     s@(id,rs) <- lift get
-    let (l, (idl, _)) = runState (runMaybeT $ tElliExpr' ll lr) s
+    let (l, (idl, _)) = runState (runMaybeT $ tElliExpr' ll lr) (id,[])
     l' <- hoistMaybe l
     lift $ put (id+idl, rs)
     return $ Var "reverse" `App` (Var "inits" `App` l')
@@ -275,9 +281,7 @@ tInterpolateGo l r
         return $ Var $ makeElliAlias er
   where
     isElliAble :: Expr -> Bool
-    isElliAble (Value (Con _))  = True
-    isElliAble (Var _)          = True
-    isElliAble _                = False
+    isElliAble = isInt
 
 ------------------------------------------------------------------------
 -- 
@@ -313,6 +317,8 @@ idxToName i = case idxToExpr i of
 neighbors :: [a] -> [(a, a)]
 neighbors xs = zip xs (drop 1 xs)
 
+isInt :: Expr -> Bool
+isInt = isJust . exprCalc
 
 exprConstant :: Expr -> Int
 exprConstant t = 

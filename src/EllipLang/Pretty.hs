@@ -4,6 +4,7 @@
 module EllipLang.Pretty where
 
 import EllipLang.Syntax
+import EllipLang.SmartCons (unConsSafe)
 
 import Data.Generics ( mkT, everywhere )
 import Data.List
@@ -39,7 +40,7 @@ pp' tabs (Case e alts)        =
         ++ pp' tabs (snd $ head $ filter (\x-> fst x == PVal (Boolean False)) alts)
     else "case " ++ pp' tabs e ++ " of {" ++ ppMatch alts (tabs + 1) ++ pNewline (tabs) ++  "}"
 pp' tabs (LetRec  n e1 e2)    = "let " ++ n ++ " = " ++ pp' tabs e1 ++ pNewline tabs ++ "in " ++ pp' tabs e2
-pp' tabs t@(Cons _ _)         = "[" ++ ppList tabs t ++ "]"
+pp' tabs t@(Cons _ _)         = ppList tabs t
 pp' tabs (Pair t1 t2) = "(" ++ pp' tabs t1 ++ ", " ++ pp' tabs t2 ++ ")"
 pp' tabs (Cat t1 t2) = pp' tabs t1 ++ " ++ " ++ pp' tabs t2
 -- pp' tabs (ListElement n (Var i))    = n ++ i
@@ -84,9 +85,13 @@ ppOp And    = "&&"
 ppOp (VarOp s) = "`" ++ s ++ "`"
 
 ppList :: Int -> Expr -> String
-ppList tabs (Value Empty) = ""
-ppList tabs (Cons t (Value Empty)) = pp' tabs t
-ppList tabs (Cons t ts) = pp' tabs t ++ "," ++ ppList tabs ts
+ppList tabs l = case unConsSafe l of
+    Just l'     -> "[" ++ intercalate ", " (fmap (pp' tabs) l') ++ "]"
+    Nothing     -> ppCons tabs l
+  where
+    ppCons tabs (Cons x xs)     = pp' tabs x ++ ":" ++ ppCons tabs xs
+    ppCons tabs (Value Empty)   = "[]"
+    ppCons tabs t               = pp' tabs t
 
 ppAbstr :: Int -> Expr -> String
 ppAbstr tabs t = let 
@@ -151,7 +156,7 @@ ppVal Empty       = "[]"
 ppVal (Closure n t e)   = "CLOSURE"-- "CLOSURE( " ++ ppEnv e ++ "|-" ++ pp (Abstr n t) ++ ")"
 ppVal (FreeVar n)   = n
 ppVal (VPair v1 v2) = "(" ++ ppVal v1 ++ ", " ++ ppVal v2 ++ ")"
-ppVal (Boolean b)   = if b then "true" else "false"
+ppVal (Boolean b)   = if b then "True" else "False"
 ppVal _             = "Error"
 
 spacer :: String
@@ -193,6 +198,7 @@ makeElliAlias ElliRange {ed_t=t, ed_id=id} = makeElliAlias' t id
     makeElliAlias' :: ElliType -> Id -> Name
     makeElliAlias' (ElliList n) i = "_" ++ n ++ show i
     makeElliAlias' ElliCounter i = "_" ++ show i
+    makeElliAlias' (ElliExpr _) i = "_" ++ show i
 
 
 miniHaskellPrelude = foldr1 (\l r -> l ++ "\n" ++ r)

@@ -1,37 +1,37 @@
-let error = \err -> err errzzzzz
+error = \err -> err errzzzzz
 
 
 
 
-let add = \a b -> a+b
+add = \a b -> a+b
 
-let sub = \a b -> a-b
+sub = \a b -> a-b
 
-let succ = \a -> a+1
+succ = \a -> a+1
 
-let negate = \a -> 0 - a
+negate = \a -> 0 - a
 
-let max = \a b -> if a > b then a else b
+max = \a b -> if a > b then a else b
 
-let min = \a b -> if a < b then a else b
+min = \a b -> if a < b then a else b
 
-let abs = \a -> (a * a) `div` a
+abs = \a -> (a * a) `div` a
 
-let cat = \list1 list2 -> 
+cat = \list1 list2 -> 
     let go = \xs ys -> case xs of {
         []      -> ys;
         x:xr    -> x:(go xr ys);
     }
     in go list1 list2
 
-let length = \xs ->
+length = \xs ->
     let go = \xs -> case xs of {
         []      -> 0;
         x:xr    -> 1 + go xr;
     }
     in go xs
 
-let reverse = \xs ->
+reverse = \xs ->
     let go = \xs -> case xs of {
         []      -> [];
         x:xr    -> cat (go xr) [x];
@@ -43,7 +43,7 @@ let reverse = \xs ->
 
 
 
-let drop = \k xs ->
+drop = \k xs ->
     let go = \k xs -> case xs of {
         []      -> [];
         x:xr    -> 
@@ -53,7 +53,7 @@ let drop = \k xs ->
     }
     in go k xs
 
-let take = \k xs ->
+take = \k xs ->
     let go = \k xs -> 
         if k == 0 
         then []
@@ -63,7 +63,7 @@ let take = \k xs ->
         }
     in go k xs
 
-let first = \xs ->
+first = \xs ->
     let go = \xs -> case xs of {
         []      -> error 100;
         x:xr    -> 
@@ -73,12 +73,12 @@ let first = \xs ->
     }
     in go xs
 
-let tail = \xs -> case xs of {
+tail = \xs -> case xs of {
     []  -> error 100;
     x:xs -> xs;
 }
 
-let last = \xs ->
+last = \xs ->
     let go = \xs -> case xs of {
         []      -> error 100;
         x:xr    -> 
@@ -88,12 +88,12 @@ let last = \xs ->
     }
     in go xs
 
-let head = \xs -> case xs of {
+head = \xs -> case xs of {
     []  -> error 100;
     x:xs -> x;
 }
 
-let subscript = \xs k -> 
+subscript = \xs k -> 
     let go = \xs k -> 
         if k == 0
         then head xs
@@ -105,30 +105,30 @@ let subscript = \xs k ->
 
 
 
-let foldr = \f acc xs ->
+foldr = \f acc xs ->
     let go = \f acc xs -> case xs of {
         []      -> acc;
         x:xs    -> f x (go f acc xs);
     }
     in go f acc xs
 
-let foldl = \f acc xs ->
+foldl = \f acc xs ->
     let go = \f acc xs -> case xs of {
         []      -> acc;
         x:xs    -> go f (f acc x) xs;
     }
     in go f acc xs
 
-let foldl1 = \f xs -> foldl f (head xs) (tail xs)
+foldl1 = \f xs -> foldl f (head xs) (tail xs)
 
-let foldr1 = \f xs -> foldr f (last xs) (first xs)
-
-
+foldr1 = \f xs -> foldr f (last xs) (first xs)
 
 
 
 
-let slice = \xs begin end ->
+
+
+slice = \xs begin end ->
     if begin < 1                then []
     else if begin > length xs   then []
     else if end < 1             then []
@@ -138,7 +138,7 @@ let slice = \xs begin end ->
         let endP    = (length xs) - end + 1
         in drop (beginP - 1) (take endP reverse xs)
 
-let range = \begin end ->
+range = \begin end ->
     let go = \begin end ->
         if begin == end         then [begin]
         else if begin < end     then begin:(go (begin+1) end)
@@ -148,16 +148,16 @@ let range = \begin end ->
 
 
 
-let id = \x -> x
+id = \x -> x
 
-let map = \f xs ->
+map = \f xs ->
     let go = \xs -> case xs of {
         []      -> [];
         x:xr    -> (f x):(go xr);
     }
     in go xs
 
-let zipWith = \f xs ys ->
+zipWith = \f xs ys ->
     let go = \xs ys -> case xs of {
         []      -> [];
         x:xr  -> case ys of {
@@ -167,7 +167,7 @@ let zipWith = \f xs ys ->
     }
     in go xs ys
 
-let zipWith3 = \f xs ys zs ->
+zipWith3 = \f xs ys zs ->
     let go = \xs ys zs -> case xs of {
         []      -> [];
         x:xr  -> case ys of {
@@ -180,7 +180,7 @@ let zipWith3 = \f xs ys zs ->
     }
     in go xs ys zs
 
-let zipWith4 = \f xs ys zs ws ->
+zipWith4 = \f xs ys zs ws ->
     let go = \xs ys zs ws -> case xs of {
         []      -> [];
         x:xr  -> case ys of {
@@ -196,7 +196,7 @@ let zipWith4 = \f xs ys zs ws ->
     }
     in go xs ys zs ws
 
-let zipWith5 = \f xs ys zs ws vs ->
+zipWith5 = \f xs ys zs ws vs ->
     let go = \xs ys zs ws vs -> case xs of {
         []      -> [];
         x:xr  -> case ys of {
@@ -214,3 +214,16 @@ let zipWith5 = \f xs ys zs ws vs ->
         };
     }
     in go xs ys zs ws vs
+
+filter p xs = 
+    let go = (\x xr -> if p x then x:xr else xr)
+    in foldr go [] xs
+
+app f x = f x
+
+inits list =
+    let go = \ys xs -> case xs of {
+        []      -> [ys];
+        x:xr    -> ys:(go (ys ++ [x]) xr);
+    }
+    in go [] list
