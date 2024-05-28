@@ -476,6 +476,9 @@ elliTokenToExpr = everywhere' (mkT go)
                                else ElliFoldl l r op1
             _               -> ElliFoldl l r op1
         | otherwise = e
+    
+    go e@(PreElli `App` t) = t
+    go e@(t `App` PreElli) = t
 
     go e = e
 

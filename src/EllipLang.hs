@@ -31,13 +31,18 @@ import System.IO
 parseTranslate :: Text -> IO ()
 parseTranslate s = parseMaybe pExpr s & fromMaybe (error "bad parse") & translate & pp & putStrLn
 
-data ReplArg = ShowTranslate | FileVerbose | ShowParse
+data ReplArg = ShowTranslate | FileVerbose | ShowParse | ShowAbstract
     deriving (Eq, Show)
 
 mkReplArg :: String -> Maybe ReplArg
 mkReplArg "translate"   = Just ShowTranslate
 mkReplArg "parse"       = Just ShowParse
+mkReplArg "abstract"   = Just ShowAbstract
 mkReplArg _             = Nothing
+
+p :: Bool -> Expr -> String
+p False t = pp t
+p True t = show t
 
 repl :: [ReplArg] -> IO ()
 repl args = repl' args prelude
@@ -50,7 +55,7 @@ repl' args env = do
         ':':'t':' ':rest    -> case runParser pDecl "" (T.pack ln) of
             Right expr  -> do
                 let translated = translate expr
-                putStrLn $ pp translated
+                putStrLn $ p pAbstr translated
                 repl' args env
             Left  err   -> do
                 putStrLn $ errorBundlePretty err
@@ -58,11 +63,12 @@ repl' args env = do
 
         _                   -> go ln
   where
+    pAbstr = ShowAbstract `elem` args
     go ln = case runParser pDecl "" (T.pack ln) of 
             Right (Decl s expr) -> do
-                when (ShowParse `elem` args) (putStrLn . pp $ expr)
+                when (ShowParse `elem` args) (putStrLn . p pAbstr $ expr)
                 let translated = translate expr
-                when (ShowTranslate `elem` args) (putStrLn . pp $ translated)
+                when (ShowTranslate `elem` args) (putStrLn . p pAbstr $ translated)
 
                 let res = eval env translated
                 putStr $ s ++ " = "
@@ -70,7 +76,7 @@ repl' args env = do
                 repl' args (Map.fromList [(NamedVar s, BVal res)] `Map.union` env)
             Right expr  -> do
                 let translated = translate expr
-                when (ShowTranslate `elem` args) (putStrLn . pp $ translated)
+                when (ShowTranslate `elem` args) (putStrLn . p pAbstr $ translated)
                 let res = eval env translated
                 putStrLn $ ppVal res
                 repl' args env
@@ -84,8 +90,8 @@ prompt text = do
     hFlush stdout
     getLine
 
-run :: Bool -> Env -> [String] -> IO Env
-run verbose env smts = go env smts
+run :: Bool -> Bool -> Env -> [String] -> IO Env
+run verbose pAbstr env smts = go env smts
   where
     go :: Env -> [String] -> IO Env
     go env (s:ss) = case runParser pDecl "" (T.pack s) of
@@ -96,7 +102,7 @@ run verbose env smts = go env smts
         Right (Decl s expr) -> do
             let translated = translate expr
             let res = eval env translated
-            when verbose (putStrLn $ "(" ++ show s ++ ", " ++ pp translated ++ ")" )
+            when verbose (putStrLn $ "(" ++ show s ++ ", " ++ p pAbstr translated ++ ")" )
             let newEnv = Map.fromList [(NamedVar s, BVal res)]
             went <- go (Map.union newEnv env) ss
             return $ Map.union newEnv went

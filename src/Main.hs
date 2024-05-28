@@ -8,20 +8,20 @@ import EllipLang.MHSPrelude (prelude)
 import System.Environment (getArgs)
 import System.IO
 import Data.Function ((&))
-
-passedArgs = [ShowParse, ShowTranslate]
+import Data.Maybe (catMaybes)
 
 main :: IO ()
 main = do
     args <- getArgs
     case args of
-        []  -> repl passedArgs
-        [f] -> replFile f
-        _   -> error "weird args"
+        []  -> repl []
+        f:rest -> replFile rest f
 
-replFile :: String -> IO ()
-replFile f = do
+replFile :: [String] -> String -> IO ()
+replFile args f = do
+    let args' = catMaybes $ mkReplArg <$> args
+    print args'
     handle <- openFile f ReadMode
     contents <- hGetContents handle
-    newEnv <- processFile contents & run True prelude
-    repl' passedArgs newEnv
+    newEnv <- processFile contents & run True (ShowAbstract `elem` args') prelude
+    repl' args' newEnv

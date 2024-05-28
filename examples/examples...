@@ -1,3 +1,4 @@
+testList = [2,5,4,1,3]
 
 
 ------------------------------------------------------------------------
@@ -49,7 +50,10 @@ intersperse c xs = case xs of {
     [x1, ..., xn]   -> [x1, c] ++ ... ++ [x{n-1}, c] ++ [xn];
 }
 
--- intercalate
+intercalate c xs = case xs of {
+    []              -> [];
+    [x1, ..., xn]   -> (x1 ++ c) ++ ... ++ (x{n-1} ++ c) ++ xn;
+}
 
 -- transpose
 
@@ -130,14 +134,40 @@ scanl1 g [x1, ..., xn] = [x1, (x1 `g` x2), ..., (x1 `g` ... `g` xn)]
 
 -- My language does not have infinite lists
 
-insertAt y k [x1, ..., xn] = [x1, ..., x{k}, y, x{k+1}, ..., xn]
 
 
 ------------------------------------
 -- unfolding
 ------------------------------------
 
--- My language does not have unfolding (but it would be cool)
+-- unfolding patterns?
+
+------------------------------------------------------------------------
+--
+-- INDEXING LISTS
+-- 
+------------------------------------------------------------------------
+
+subscript1 [x1, ..., xn] k = xk
+
+subscript [x1, ..., xn] k = x{k+1}
+
+elemIndices = elemIndices1
+
+elemIndices1 y [x1, ..., xn]
+    = (if y == x1 then [1] else []) ++ ... ++ (if y == xn then [n] else []) ++ []
+
+elemIndices2 y [x1, ..., xn] = foldr cat [] $
+    from if y == x1 then [1] else []
+    to   if y == xn then [n] else []
+
+findIndices1 p [x1, ..., xn] 
+    = (if p x1 then [1] else []) ++ ... ++ (if p xn then [n] else []) ++ []
+
+findIndices2 p [x1, ..., xn] = foldr cat [] $
+    from if p x1 then [1] else []
+    to   if p xn then [n] else []
+
 
 ------------------------------------------------------------------------
 --
@@ -149,19 +179,28 @@ insertAt y k [x1, ..., xn] = [x1, ..., x{k}, y, x{k+1}, ..., xn]
 -- Extracting sublists
 ------------------------------------
 
-take k [x1, ..., xn] = [x1, ..., xk]
+takeelli k [x1, ..., xn] = [x1, ..., xk]
 
-drop k [x1, ..., xn] = [xk, ..., xn]
+dropelli k [x1, ..., xn] = [xk, ..., xn]
 
 splitAt k [x1, ..., xn] = ([x1, ..., xk], [x{k+1}, ..., xn])
 
--- takeWhile
+takeWhile p [x1, ..., xn] = case findIndices1 (\x -> not (p x)) [x1, ..., xn] of {
+    []      -> [];
+    k:ks    -> [x1, ..., x{k-1}];
+}
 
--- dropWhile
+dropWhile p [x1, ..., xn] = case findIndices1 (\x -> not (p x)) [x1, ..., xn] of {
+    []      -> [x1, ..., xn];
+    k:ks    -> [x{k}, ..., xn];
+}
 
--- dropWhileEnd
+span p xs = (takeWhile p xs, dropWhile p xs)
 
--- span
+dropWhileEnd p [x1, ..., xn] = case elemIndices1 p [x1, ..., xn] of {
+    []              -> [x1, ..., xn];
+    [k1, ..., km]   -> [x{km}, ..., xn];
+}
 
 -- break
 
@@ -170,13 +209,42 @@ stripPrefix [p1, ..., pk] [x1, ..., xn] =
     then [x{k+1}, ..., xn]
     else error
 
--- group
 
-group [x1, ..., xn] = []
+{- group xs =
+    let go = \xs -> case xs of {
+        [] -> []
+        [x1, ..., xn]  
+    }-}
 
--- groupBy
+-- indicesOfChange eq [x1, ..., xn] =
+
+
+append y [x1, ..., xn] = [x1, ..., xn, y]
+
+catLast y [x1, ..., xn] = [x1, ..., x{n-1}, xn ++ y]
+
+ppa x f = f x
+
+group [x1, ..., xn] = foldl ppa [[x1]] $
+    from if x2 == x1     then catLast [x2] else append [x2]
+    to   if xn == x{n-1} then catLast [xn] else append [xn]
+
+groupByNeighbor eq [x1, ..., xn] = foldl ppa [[x1]] $
+    from if eq x1 x2     then catLast [x2] else append [x2]
+    to   if eq x{n-1} xn then catLast [xn] else append [xn]
 
 initselli [x1, ..., xn] = [ [], [x1], ..., [x1, ..., xn]]
+
+
+-- no indicesOfChangeBy
+
+{-
+groupBy eq [x1, ..., xn] = case [1] ++ (indicesOfChangeBy eq [x1, ..., xn]) ++ [n] of {
+    []              -> [x1, ..., xn];
+    [k1, ..., km]   -> 
+        from [x{k1}, ..., x{k2}]
+        to   [x{k{m-1}}, ..., x{km}]
+}-}
 
 -- tails [x1, ..., xn] = [ [x1, ..., xn], ..., [] ]
 
@@ -215,23 +283,16 @@ elem y [x1, ..., xn] = (y == x1) || ... || (y == xn) || False
 
 notElem y [x1, ..., xn] = (y /= x1) && ... && (y /= xn) && True
 
-{- Needs better patterns
-lookup yk [(k1, v1), ..., (kn, vn)] = 
-    case elemIndex1 yk [k1, ..., kn] of
-        Just i  -> Just vi
-        Nothing -> Nothing
--}
-
 ------------------------------------
 -- searching with a predicate
 ------------------------------------
 
--- find
+find p x = head (filterelli p x)
 
-myfilter p [x1, ..., xn] 
+filterelli p [x1, ..., xn] 
     = (if p x1 then [x1] else []) ++ ... ++ (if p xn then [xn] else []) ++ []
 
-myfilter2 p [x1, ..., xn] = foldr cat [] $
+filterelli2 p [x1, ..., xn] = foldr cat [] $
     from if p x1 then [x1] else []
     to   if p xn then [xn] else []
 
@@ -239,31 +300,6 @@ myfilter2 p [x1, ..., xn] = foldr cat [] $
 {- ditto
 partition p [x1, ..., xn] = ([x1, ..., xn | p x], [x1, ..., xn | not (p x)])
 -}
-
-------------------------------------------------------------------------
---
--- INDEXING LISTS
--- 
-------------------------------------------------------------------------
-
-subscript1 [x1, ..., xn] k = xk
-
-subscript [x1, ..., xn] k = x{k+1}
-
-elemIndices1 y [x1, ..., xn]
-    = [if y == x1 then [1] else []] ++ ... ++ [if y == xn then [n] else []] ++ []
-
-elemIndices2 y [x1, ..., xn] = foldr cat [] $
-    from if y == x1 then [1] else []
-    to   if y == xn then [n] else []
-
-findIndices1 p [x1, ..., xn] = [if p x1 then [1] else []] ++ ... ++ [if p xn then [n] else []]
-
-findIndices2 p [x1, ..., xn] = foldr cat [] $
-    from if p x1 then [1] else []
-    to   if p xn then [n] else []
-
-
 
 ------------------------------------------------------------------------
 --
@@ -289,14 +325,30 @@ zipWith f [x1, ..., xn] [y1, ..., ym] = [f x1 y1, ..., f xn ym]
 --
 ------------------------------------------------------------------------
 
-nub [x1, ..., xn] = foldr cat [] (
-    from if x1 `elem` []                then [] else [x1]
-    to   if xn `elem` [x1, ..., x{n-1}] then [] else [xn])
 
-{- delete y [x1, ..., xn] = case k = findIndices1 y [x1, ..., xn] of {
-    k:xs    -> [x1, ..., x{k-1}, x{k+1}, ..., xn];
+--    , if x3 `elem` [x1, x2]          then [] else [x3]
+
+nub3 [x1, ..., xn] = foldr cat []
+    [ x1
+    , if x2 `elem` [x1]              then [] else [x2]
+    , ...
+    , if xn `elem` [x1, ..., x{n-1}] then [] else [xn]
+    ]
+
+nub2 [x1, ..., xn] = 
+    (if x1 `elem` []                then [] else [x1])
+    ++ ... ++
+    (if xn `elem` [x1, ..., x{n-1}] then [] else [xn])
+    ++ []
+
+nub [x1, ..., xn] = foldr cat [] $
+    from if x1 `elem` []                then [] else [x1]
+    to   if xn `elem` [x1, ..., x{n-1}] then [] else [xn]
+
+delete y [x1, ..., xn] = case elemIndices1 y [x1, ..., xn] of {
     []      -> [x1, ..., xn];
-} -}
+    k:ks    -> [x1, ..., x{k-1}, x{k+1}, ..., xn];
+}
     
 -- \\
 
@@ -314,8 +366,10 @@ nub [x1, ..., xn] = foldr cat [] (
 
 -- sortOn
 
--- insert
-
+insert y [x1, ..., xn] = case findIndices1 (\a -> a > y) [x1, ..., xn] of { 
+    []      -> [x1, ..., xn, y];
+    k:ks    -> [x1, ..., x{k-1}, y, xk, ..., xn];
+}
 
 
 ------------------------------------------------------------------------
@@ -328,11 +382,18 @@ nub [x1, ..., xn] = foldr cat [] (
 -- splitAt mapR, foldm, foldz, dotProduct, concatMap, intersperse, 
 -- all, and, rdup (see nub)
 
--- Failed: insert, lookup, takeWhile, dropWhile, groupBy
+-- Failed: lookup, groupBy
 
-{- rdup would also need more advanced list patterns
-rdup [x1, ..., y, ..., y, ..., xn] = [x1, ..., y, ..., xn]
--}
+-- Lookup would need better list pattern. groupBy I couln't think of anything,
+-- but I might someday.
+
+lookup2 needlek [k1, ..., km] [v1, ..., vn] = 
+    if m /= n
+    then error
+    else case elemIndices1 needlek [k1, ..., km] of {
+    []      -> error;
+    i:is    -> v{i};
+}
 
 fac n = n * ... * 1
 
@@ -347,6 +408,8 @@ dotProduct [x1, ..., xn] [y1, ..., ym]
     = if n == m
       then 0 + x1*y1 + ... + xn*yn
       else error
+
+insertAt y k [x1, ..., xn] = [x1, ..., x{k}, y, x{k+1}, ..., xn]
 
 ------------------------------------------------------------------------
 --
@@ -374,6 +437,25 @@ sublistOccurs [y1, ..., yk] [x1, ..., xn] = count True (
     from [y1, ..., yk] == [x1, ..., xk]
     to   [y1, ..., yk] == [x{n-k+1}, ..., xn])
 
+binSearch y xs = 
+    let go = \xs -> case xs of {
+        []              -> False;
+        [x1, ..., xn]   -> 
+            let k = n `div` 2 + 1
+            in if xk == y       then True
+            else if xk > y      then go [x1, ..., x{k-1}]
+            else                     go [x{k+1}, ..., xn];
+        }
+    in go xs
+
 isEven x = (x `mod` 2) == 0
 
 isOdd x = (x `mod` 2) == 1
+
+gt5 x = x > 5
+
+lt5 x = x < 5
+
+hourglass x = [ [1, ..., x], ..., [x, ..., 1] ]
+
+twists [x1, ..., xn] = [ [x1, ..., xn], ..., [xn, ..., x1] ]

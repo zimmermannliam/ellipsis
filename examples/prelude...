@@ -125,9 +125,6 @@ foldr1 = \f xs -> foldr f (last xs) (first xs)
 
 
 
-
-
-
 slice = \xs begin end ->
     if begin < 1                then []
     else if begin > length xs   then []
@@ -136,7 +133,7 @@ slice = \xs begin end ->
     else
         let beginP  = (length xs) - begin + 1 in
         let endP    = (length xs) - end + 1
-        in drop (beginP - 1) (take endP reverse xs)
+        in drop (beginP - 1) (take endP (reverse xs))
 
 range = \begin end ->
     let go = \begin end ->
@@ -227,3 +224,5 @@ inits list =
         x:xr    -> ys:(go (ys ++ [x]) xr);
     }
     in go [] list
+
+not x = if x == True then False else True

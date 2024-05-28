@@ -91,6 +91,7 @@ data Pattern = PCons Name Name
              | PCons2 Pattern Pattern
              | PVar Name
              | PVal Val
+             | PPair Pattern Pattern
              | PEllipsis Name Idx -- x1 ... xn -> x2 ... xn
              deriving (Eq, Show, Data, Typeable)
 

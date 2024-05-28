@@ -231,13 +231,33 @@ tInterpolateGo (Value Empty) (Ellipsis rl rr) = do
 -- [x1...xn] ... []
 tInterpolateGo (Ellipsis ll lr) (Value Empty) = do
     s@(id,rs) <- lift get
-    let (l, (idl, _)) = runState (runMaybeT $ tElliExpr' ll lr) (id,[])
-    l' <- hoistMaybe l
-    lift $ put (id+idl, rs)
-    return $ Var "reverse" `App` (Var "inits" `App` l')
+    let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' ll lr) (id,[])
+    r' <- hoistMaybe r
+    let newRange = ElliRange { ed_t = ElliExpr $ Var "reverse" `App` Var "inits" `App` r'
+                             , ed_ie = Value (Con 0)
+                             , ed_ib = Value (Con 0)
+                             , ed_id = id+idr+1
+                             }
+    lift $ put (id+idr+1, newRange:rs)
+    return $ Var $ makeElliAlias newRange
 
 -- (el1:...:elk:[], [er1, ..., er2])
 tInterpolateGo eli@(Cons el1 _) ell@(Ellipsis er1 er2) = do
+    s@(id,rs) <- lift get
+    let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' er1 er2) (id,[])
+    r' <- hoistMaybe r
+    eli' <- hoistMaybe $ unConsSafe eli
+
+    let newRange = ElliRange { ed_t = ElliExpr $ 
+        Var "drop" `App` Value (Con $ length eli') `App` (Var "inits" `App` r')
+                             , ed_ie = Value (Con 0)
+                             , ed_ib = Value (Con 0)
+                             , ed_id = id+idr+1
+                             }
+    lift $ put (id+idr+1, newRange:rs)
+    return $ Var $ makeElliAlias newRange
+
+{-
     -- (er1, er2) ~> er_inner
     s@(id,rs) <- lift get
     let (er_innerM, sr@(idr, _)) = runInterpolate s er1 er2
@@ -268,7 +288,7 @@ tInterpolateGo eli@(Cons el1 _) ell@(Ellipsis er1 er2) = do
     runInterpolate :: ElliState -> Expr -> Expr -> (Maybe Expr, ElliState)
     runInterpolate s l r = runState (runMaybeT $ tInterpolate l r) s
 
-
+-}
 -- Catch-all: if you can take both sides and turn it into a simple counter,
 -- then do that. Otherwise, keep iterating in.
 tInterpolateGo l r 

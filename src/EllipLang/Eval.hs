@@ -30,10 +30,17 @@ eval :: Env -> Expr -> Val
 
 -- Lambda Calculus
 eval e (Var vn) = evalBinding e (envLookup e vn)
+eval e (App (App (Var "div") t1) t2) = eval e $ Op Div t1 t2
+eval e (App (App (Var "mod") t1) t2) = eval e $ Op Mod t1 t2
+
 eval e (App t1 t2) = case eval e t1 of
     Closure x t1b e2 -> eval (Map.insert (NamedVar x) (BVal $ eval e t2) e2) t1b
-    FreeVar "div"   -> eval e $ Op Div t1 t2
-    FreeVar "mod"   -> eval e $ Op Mod t1 t2
+    FreeVar "fst"    -> case eval e t2 of
+        (VPair v1 v2)  -> v1
+        _                   -> error "expected fst to be applied to a pair"
+    FreeVar "snd"    -> case eval e t2 of
+        (VPair v1 v2)  -> v2
+        _                   -> error "expected snd to be applied to a pair"
     _           -> errorOut e $ "Expected fn (" ++ pp t1 ++ ") to be applied"
 eval e (Abstr x t) = Closure x t e
 
@@ -395,7 +402,8 @@ patternMatchEval :: Env -> Expr -> Alts -> Val
 patternMatchEval e t (p:ps) = case patternMatch e t p of
                                 Nothing     -> patternMatchEval e t ps
                                 Just v      -> v
-patternMatchEval e t []     = error $ "Ran out of patterns"
+patternMatchEval e t []     = error $ "Ran out of patterns; target: " ++ pp t
+    ++ " target value: " ++ ppVal (eval e t)
 
 -- Match a single possibility vs Expr
 patternMatch :: Env -> Expr -> (Pattern, Expr) -> Maybe Val
