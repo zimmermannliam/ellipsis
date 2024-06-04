@@ -16,7 +16,13 @@ type ErrParser = Void
 type Parser = Parsec ErrParser String
 
 keywords :: [String]
-keywords = []
+keywords =
+    [ "case", "of"
+    ]
+
+same :: Eq b => (a -> b) -> [a] -> Bool
+same _ []       = True
+same f (x:xs)   = all (\y -> f x == f y) xs
 
 ------------------------------------------------------------------------
 --
@@ -36,6 +42,7 @@ lexeme = L.lexeme sc
 paren :: Parser a -> Parser a
 paren = between (symbol "(") (symbol ")")
 
+symbol :: String -> Parser String
 symbol = L.symbol sc
 
 ------------------------------------------------------------------------
@@ -45,7 +52,8 @@ symbol = L.symbol sc
 ------------------------------------------------------------------------
 pStmt :: Parser Stmt
 pStmt = choice
-  [ StmtEval <$> pExpr
+  [ try $ StmtDecl <$> pDecl
+  , try $ StmtEval <$> pExpr
   , pStmtType
   , StmtQuit <$ symbol ":q"
   ] <* eof
@@ -60,6 +68,58 @@ pStmtType = do
 -- DECLARATIONS
 --
 ------------------------------------------------------------------------
+
+data PreDecl 
+    = TypeDecl Name Type
+    | FunDecl Name [Pattern] Expr
+
+pDecl :: Parser Decl
+pDecl = go >>= unPreDecl
+  where
+    go :: Parser [PreDecl]
+    go = many $ choice
+        [ try pTypeDecl
+        , pFunDecl
+        ]
+    
+unPreDecl :: [PreDecl] -> Parser Decl
+unPreDecl (dec:rest) 
+    | (TypeDecl v t) <- dec = do
+        rest' <- go v rest
+        if same (length . fst) rest'
+            then return $ Decl blank v t rest'
+            else fail "Not same patterns"
+    | (FunDecl v _ _) <- dec = do
+        rest' <- go v (dec:rest)
+        return $ Decl blank v TypeAny rest'
+  where
+    go :: String -> [PreDecl] -> Parser [([Pattern], Expr)]
+    go _ ((TypeDecl _ _):_)        = fail "type decl too late"
+    go v ((FunDecl v' pats e):decs)   
+        | v' /= v = fail "Bad name in same dec"
+        | otherwise = do
+            decs' <- go v decs
+            return $ (pats, e):decs'
+    go _ [] = return []
+unPreDecl _ = fail "nah"
+
+pTypeDecl :: Parser PreDecl
+pTypeDecl = do
+    v <- pIdentifier
+    void $ symbol "::"
+    t <- pType
+    void $ symbol ";"
+    return $ TypeDecl v t
+
+pFunDecl :: Parser PreDecl
+pFunDecl = do
+    v <- pIdentifier
+    pats <- many pPattern
+    void $ symbol "="
+    e <- pExpr
+    void $ symbol ";"
+    return $ FunDecl v pats e
+
 
 ------------------------------------------------------------------------
 --
@@ -103,12 +163,12 @@ opTable =
       ]
     , [ InfixR (fillIfxOp blank Or <$ ifxOpSymbol Or)
       ]
-    , [ Postfix pTypeDec
+    , [ Postfix pTypeSig
       ]
     ]
 
-pTypeDec :: Parser (Expr -> Expr)
-pTypeDec = pTypeAnno (TypeSig blank)
+pTypeSig :: Parser (Expr -> Expr)
+pTypeSig = pTypeAnno (TypeSig blank)
 
 -- Terms
 
@@ -119,6 +179,7 @@ pTerm = choice
     , pAbstr
     , paren pExpr
     , pList
+    , pCase
     ]
 
 pCon :: Parser Constant
@@ -180,6 +241,23 @@ pAPat = choice
     , paren pPattern
     ]
 
+pCase :: Parser Expr
+pCase = do
+    void (symbol "case")
+    e_target <- pExpr
+    void (symbol "of")
+    alts <- between (symbol "{") (symbol "}") pAlts
+    return $ Case blank e_target alts
+  where
+    pAlts :: Parser [(Pattern, Expr)]
+    pAlts = many $ pAlt <* symbol ";"
+
+    pAlt :: Parser (Pattern, Expr)
+    pAlt = do
+        pat <- pPattern
+        void (symbol "->")
+        e <- pExpr
+        return (pat, e)
 
 ------------------------------------------------------------------------
 --

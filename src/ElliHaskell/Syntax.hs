@@ -2,8 +2,6 @@ module ElliHaskell.Syntax where
 
 import ElliHaskell.Types (Type (TypeInt, TypeBool, TypeAny, TypeAbstr, TypeList, TypeSome))
 
-import Control.Monad.Combinators.Expr (Operator (InfixL, InfixN, InfixR))
-
 import Data.Map (Map, fromList, insert, (!?), (!))
 
 ------------------------------------------------------------------------
@@ -19,7 +17,7 @@ data Stmt
     | StmtQuit
     deriving (Eq, Show)
 
-data Decl = Decl Info [Pattern] Expr
+data Decl = Decl Info Name Type [([Pattern], Expr)]
     deriving (Eq, Show)
 
 data Expr
@@ -31,6 +29,7 @@ data Expr
     | Ifx Info Expr Op Expr
     | TypeSig Info Type Expr
     | List Info [Expr]
+    | Case Info Expr [Alt]
     deriving (Eq, Show)
 
 data Constant
@@ -44,9 +43,10 @@ data Pattern
     | TypedPat Type Pattern
     deriving (Eq, Show)
 
-type Val = Expr
-type Name = String
-type Info = Int
+type Val    = Expr
+type Name   = String
+type Info   = Int
+type Alt    = (Pattern, Expr)
 
 blank :: Info
 blank = 0

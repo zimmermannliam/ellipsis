@@ -459,3 +459,25 @@ lt5 x = x < 5
 hourglass x = [ [1, ..., x], ..., [x, ..., 1] ]
 
 twists [x1, ..., xn] = [ [x1, ..., xn], ..., [xn, ..., x1] ]
+
+lt a b = a < b
+
+geq a b = a > b || a == b
+
+quicksort list =
+    let go = \xs -> case xs of {
+        []              -> [];
+        [x1, ..., xn]   -> 
+            (go $ filterelli (geq x1) [x2, ..., xn])
+            ++ [x1]
+            ++ (go $ filterelli (lt x1) [x2, ..., xn]);
+    }
+    in go list
+
+kthSmallest k list = subscript1 (quicksort list) k
+
+sort [x1, ..., xn] = 
+    [ 1 `kthSmallest` [x1, ..., xn]
+    , ...
+    , n `kthSmallest` [x1, ..., xn]
+    ]

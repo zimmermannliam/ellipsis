@@ -8,7 +8,8 @@ data Type
     | TypePair Type Type
     | TypeList Type
     | TypeFun Type Type
-    | TypeAny
+    | TypeSome Int
+    | TypeAny   
     deriving (Show, Eq, Data, Typeable)
 
 typeEq :: Type -> Type -> Bool

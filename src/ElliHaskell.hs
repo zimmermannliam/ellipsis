@@ -10,15 +10,58 @@ import Text.Megaparsec (errorBundlePretty, parse, eof)
 import Data.Map (empty)
 import System.Console.Readline (readline)
 import Data.Maybe (fromMaybe)
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.State (evalStateT)
+import Control.Monad.Trans (lift)
 
+-- For repl:
+-- import Text.Megaparsec (parseTest)
+
+prelude :: Env
 prelude = empty
+preludeCxt :: Cxt
 preludeCxt = empty
 
 data EHSErr = EP ErrParser | EE ErrEval
 
 repl :: IO ()
-repl = go preludeCxt prelude
+repl = runReaderT go (preludeCxt, prelude)
   where
+    go :: ReaderT (Cxt, Env) IO ()
+    go = do
+        s <- lift $ fromMaybe "" <$> readline "...> "
+        case parse (pStmt <* eof) "" s of
+            Left err -> do
+                lift . putStrLn $ errorBundlePretty err
+                go
+            Right (StmtType e) -> do
+                withReaderT fst $ runType e
+                go
+            Right (StmtEval e) -> do
+                runEval e
+                go
+            Right StmtQuit     -> return ()
+            _                  -> undefined
+
+
+runType :: Expr -> ReaderT Cxt IO ()
+runType e = do
+    cxt <- ask
+    case runReader (evalStateT (runExceptT $ typeInfer e) 0) cxt of
+        Left err -> lift $ putStrLn $ ppTypeErr err
+        Right t -> lift $ putStrLn $ ppType t
+
+runEval :: Expr -> ReaderT (Cxt, Env) IO ()
+runEval e = do
+    (cxt, env) <- ask
+    case runReader (evalStateT (runExceptT $ typeInfer e) 0) cxt of
+        Left err -> lift $ putStrLn $ ppTypeErr err
+        Right _ -> case runReader (runExceptT $ eval e) env of
+            Left err    -> lift $ putStrLn $ ppEvalErr err
+            Right val   -> lift $ putStrLn $ pp val
+
+{-
     go :: Cxt -> Env -> IO ()
     go cxt env = do
         s <- readline "...> "
@@ -33,6 +76,21 @@ repl = go preludeCxt prelude
                 runType cxt e
                 go cxt env
             Right StmtQuit     -> return ()
+            Right (StmtDecl dec@(Decl _ v _ _)) -> case typeDecl cxt dec of
+                Left err     -> do
+                    putStrLn $ ppDeclTypeErr err
+                    go cxt env
+                Right cxt'   -> case evalDecl env dec of
+                    Left err    -> do
+                        putStrLn $ ppDeclEvalErr err
+                        go cxt env
+                    Right env'  -> go cxt' env'
+
+
+runType :: Cxt -> Expr -> IO ()
+runType cxt e = case typeInfer cxt e of
+    Left err -> putStrLn $ ppTypeErr err
+    Right t  -> putStrLn $ ppType t
 
 runExpr :: Cxt -> Env -> Expr -> IO ()
 runExpr cxt env e = case typeInfer cxt e of
@@ -40,8 +98,4 @@ runExpr cxt env e = case typeInfer cxt e of
     Right _ -> case eval env e of
         Left err -> putStrLn $ ppEvalErr err
         Right val -> putStrLn $ pp val
-
-runType :: Cxt -> Expr -> IO ()
-runType cxt e = case typeInfer cxt e of
-    Left err -> putStrLn $ ppTypeErr err
-    Right t  -> putStrLn $ ppType t
+                    -}

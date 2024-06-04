@@ -2,10 +2,12 @@ module ElliHaskell.Eval where
 
 import ElliHaskell.Syntax
 import ElliHaskell.Types
-import ElliHaskell.TypeChecker (typeInfer)
 
-import Data.Map (Map, fromList, union, empty)
-import Control.Monad (mapM)
+import Data.Map (union, empty)
+import Control.Monad.Trans.Except
+import Control.Monad.Reader
+
+type Evaluation a = ExceptT ErrEval (Reader Env) a
 
 data ErrEval
     = ErrEBound Name
@@ -23,54 +25,70 @@ isVal (Con _ _)   = True
 isVal (List _ es) = all isVal es
 isVal _           = False
 
-eval :: Env -> Expr -> Either ErrEval Val
-eval env e = do
-    val <- evalgo env e
+eval :: Expr -> Evaluation Val
+eval e = do
+    val <- evalExpr e
     if isVal val
         then return val
-        else Left $ ErrENotVal val
+        else throwE $ ErrENotVal val
 
-evalgo :: Env -> Expr -> Either ErrEval Val
+evalExpr :: Expr -> Evaluation Val
 
 -- E |- v => val
-evalgo env (Var _ v)    = case env `getVal` v of
-    -- E(v) = val
-    Just val    -> Right val
-    Nothing     -> Left (ErrEBound v)
+evalExpr (Var _ v)    = do
+    env <- ask
+    case env `getVal` v of
+
+        -- E(v) = val
+        Just val    -> return val
+        Nothing     -> throwE (ErrEBound v)
 
 -- E |- \pat -> e => (E, pat, e)
-evalgo env (Abstr _ pat e) = return $ Closure blank env pat e
+evalExpr (Abstr _ pat e) = do
+    env <- ask
+    return $ Closure blank env pat e
 
 -- E |- e1 e2 => val
-evalgo env e@(App _ e1 e2) = do
-    val <- evalgo env e1
+evalExpr e@(App _ e1 e2) = do
+    val <- evalExpr e1
     case val of
         -- E |- e1 => (E', pat', e')
         Closure _ env' pat' e' -> do
+
             -- E |- e2 => val'
-            val' <- evalgo env e2
+            val' <- evalExpr e2
+
             -- val' |- pat' => E_pat
-            env_pat <- maybe (Left $ ErrENoMatch [pat'] val') Right (patternmatch val' pat')
+            env_pat <- maybe 
+                (throwE $ ErrENoMatch [pat'] val') 
+                return 
+                (patternmatch val' pat')
+
             -- E_pat + E' |- e' => val
-            evalgo (env_pat `union` env') e'
-        _                  -> Left $ ErrENotClosure e val
+            local (env_pat `union` env' `union`) $ evalExpr e'
 
-evalgo _ c@(Con _ _) = Right c
+        _                  -> throwE $ ErrENotClosure e val
 
-evalgo env (Ifx i e1 (VarOp v) e2) = eval env $ App i (App i (Var i v) e1) e2
+evalExpr c@(Con _ _) = return c
 
-evalgo env (Ifx _ e1 op e2) = do
-    val1 <- eval env e1
-    val2 <- eval env e2
-    evalOp val1 op val2
+evalExpr (Ifx i e1 (VarOp v) e2) = evalExpr $ App i (App i (Var i v) e1) e2
 
-evalgo env (TypeSig _ _ e) = evalgo env e
+evalExpr (Ifx _ e1 op e2) = do
+    val1 <- evalExpr e1
+    val2 <- evalExpr e2
+    except $ evalOp val1 op val2
 
-evalgo env (List i es) = do
-    es' <- mapM (evalgo env) es
+evalExpr (TypeSig _ _ e) = evalExpr e
+
+evalExpr (List i es) = do
+    es' <- mapM evalExpr es
     return $ List i es'
 
-evalgo _ e              = Left (ErrENotImpl e)
+evalExpr (Case _ e alts) = do
+    val <- evalExpr e
+    evalAlts val alts
+
+evalExpr e              = throwE (ErrENotImpl e)
 
 evalOp :: Val -> Op -> Val -> Either ErrEval Val
 evalOp (Con _ (I i1)) Add (Con _ (I i2)) = Right $ Con blank $ I $ i1 + i2
@@ -86,11 +104,30 @@ evalOp (Con _ (I i1)) Geq (Con _ (I i2)) = Right $ Con blank $ B $ i1 >= i2
 evalOp (Con _ (B b1)) And (Con _ (B b2)) = Right $ Con blank $ B $ b1 && b2
 evalOp (Con _ (B b1)) Or  (Con _ (B b2)) = Right $ Con blank $ B $ b1 || b2
 evalOp val1           Cons (List i vals) = Right $ List i (val1:vals)
-evalOp val1         op  val2         | not (isVal val1)     = Left $ ErrENotVal val1
-                                     | not (isVal val2)     = Left $ ErrENotVal val2
-                                     | otherwise            = Left $ ErrEOther "Bad values for operator"
+evalOp val1           _   val2           | not (isVal val1)     = Left $ ErrENotVal val1
+                                         | not (isVal val2)     = Left $ ErrENotVal val2
+                                         | otherwise            = Left $ ErrEOther "Bad values for operator"
+
+evalAlts :: Val -> [Alt] -> Evaluation Val
+evalAlts val alts = go alts
+  where
+    go :: [Alt] -> Evaluation Val
+    go ((pat, e):rest)    = case patternmatch val pat of
+        Nothing     -> go rest
+        Just env    -> local (union env) (evalExpr e)
+    go []                 = throwE (ErrENoMatch (map fst alts) val)
 
 patternmatch :: Val -> Pattern -> Maybe Env
-patternmatch val (VarPat v)         = return $ insertVal v val empty
-patternmatch (Con _ c1) (ConPat c2) = if c1 == c2 then Just empty else Nothing
-patternmatch _ (ConPat _)           = Nothing
+patternmatch val            (VarPat v)      = return $ insertVal v val empty
+patternmatch (Con _ c1)     (ConPat c2) = 
+    if c1 == c2 
+    then return empty 
+    else Nothing
+patternmatch _                  (ConPat _)  = Nothing
+patternmatch val            (TypedPat _ pat)= patternmatch val pat
+
+------------------------------------------------------------------------
+--
+-- Evaluate declarations
+--
+------------------------------------------------------------------------

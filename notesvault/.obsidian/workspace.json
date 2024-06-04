@@ -11,8 +11,12 @@
             "id": "82d9bffdbd6f1e99",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {}
+              "type": "markdown",
+              "state": {
+                "file": "daily/2024-06-03.md",
+                "mode": "source",
+                "source": false
+              }
             }
           }
         ]
@@ -81,6 +85,7 @@
             "state": {
               "type": "backlink",
               "state": {
+                "file": "daily/2024-06-03.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -97,6 +102,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
+                "file": "daily/2024-06-03.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -118,7 +124,9 @@
             "type": "leaf",
             "state": {
               "type": "outline",
-              "state": {}
+              "state": {
+                "file": "daily/2024-06-03.md"
+              }
             }
           }
         ]
@@ -140,19 +148,21 @@
   },
   "active": "82d9bffdbd6f1e99",
   "lastOpenFiles": [
-    "Todo.md",
-    "daily/2024-05-28.md",
+    "daily/2024-05-09.md",
+    "daily/2024-05-06.md",
+    "daily/2024-05-13.md",
+    "daily/2024-05-14.md",
     "daily/2024-05-20.md",
+    "daily/2024-05-28.md",
+    "daily/2024-05-30.md",
+    "daily/2024-06-03.md",
+    "Todo.md",
     "Favorites.md",
     "Meeting 2024-04-22.md",
     "daily/2024-04-05.md",
     "daily/2024-04-14.md",
     "daily/2024-04-19.md",
-    "daily/2024-05-14.md",
     "Pasted image 20240514111153.png",
-    "daily/2024-05-09.md",
-    "daily/2024-05-13.md",
-    "daily/2024-05-06.md",
     "daily/2024-05-01.md",
     "daily/2024-04-26.md",
     "Meeting 2024-4ish.md",
@@ -167,8 +177,6 @@
     "daily/2024-04-09.md",
     "Untitled.md",
     "daily/2024-04-08.md",
-    "daily/template.md",
-    "Parser.md",
     "New Text Document.txt",
     "daily"
   ]

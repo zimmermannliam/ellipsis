@@ -21,25 +21,37 @@ ppEvalErr err = "evaluation error: " ++ go err
     go (ErrENoMatch pats val) = "could not match " ++ pp val ++ " with patterns " ++ show (ppPat <$> pats)
     go (ErrENotImpl e)      = pp e ++ " is not implemented"
     go (ErrEOther s)        = s
+    go _                    = undefined
 
 ppTypeErr :: ErrType -> String
 ppTypeErr = show
 
-pp = ppgo 0
+{-
+ppTypeDeclErr :: ErrDeclType -> String
+ppTypeDeclErr = show
+-}
 
-ppgo :: Int -> Expr -> String
-ppgo tabs (Var _ v)   = v
-ppgo tabs (App _ e1 e2) = ppgo tabs e1 ++ " (" ++ ppgo tabs e2 ++ ")"
-ppgo tabs (Abstr _ pat e) = "(\\" ++ ppPat pat ++ " -> " ++ ppgo tabs e ++ ")"
-ppgo tabs (Con _ c)   = ppCon c
-ppgo tabs (Closure {}) = "CLOSURE"
-ppgo tabs (Ifx _ e1 op e2) = 
-    let s1 = ppgo tabs e1
-        s2 = ppgo tabs e2
+pp :: Expr -> String
+pp (Var _ v)   = v
+pp (App _ e1 e2) = pp e1 ++ " (" ++ pp e2 ++ ")"
+pp (Abstr _ pat e) = "(\\" ++ ppPat pat ++ " -> " ++ pp e ++ ")"
+pp (Con _ c)   = ppCon c
+pp (Closure {}) = "CLOSURE"
+pp (Ifx _ e1 op e2) = 
+    let s1 = pp e1
+        s2 = pp e2
     in s1 ++ " " ++ opinfo_ifxname (getOpInfo op) ++ " " ++ s2
-ppgo tabs (TypeSig _ t e) = "(" ++ ppgo tabs e ++ " :: " ++ ppType t ++ ")"
-ppgo tabs (List _ es)  = "[" ++ intercalate "," (map (ppgo tabs) es) ++ "]"
-ppgo _ _ = "not implemented"
+pp (TypeSig _ t e) = "(" ++ pp e ++ " :: " ++ ppType t ++ ")"
+pp (List _ es)  = "[" ++ intercalate "," (map (pp) es) ++ "]"
+pp _ = "not implemented"
+
+ppDecl :: Decl -> String
+ppDecl (Decl _ v t alts) 
+    =  v ++ " :: " ++ ppType t ++ ";\n"
+    ++ concatMap ppAlt alts
+  where
+    ppAlt :: ([Pattern], Expr) -> String
+    ppAlt (pats, e) = v ++ " " ++ unwords (ppPat <$> pats) ++ " = " ++ pp e
 
 ppCon :: Constant -> String
 ppCon (I i) = show i

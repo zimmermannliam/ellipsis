@@ -36,7 +36,6 @@ processFile s = s
     & fmap unwords
     & filter (\x -> x /= "" && not (isPrefixOf "--" x) && not (isPrefixOf "{-" x))
 
-
 resw =
     [ "if", "then", "else"
     , "\\", "->"

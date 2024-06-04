@@ -105,7 +105,17 @@ executable ellirepl
 common ellihaskell
     default-language: Haskell2010
     hs-source-dirs: src
-    build-depends: base ^>=4.17.2.1, megaparsec, containers, parser-combinators, readline
+    build-depends:  base ^>=4.17.2.1, 
+                    -- repl
+                    readline,
+                    -- parsing
+                    megaparsec,
+                    parser-combinators,
+                    -- env
+                    containers,
+                    mtl,
+                    transformers
+    ghc-options: -Wall
 
 executable ehs
     import:         ellihaskell
