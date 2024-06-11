@@ -1,8 +1,7 @@
 module ElliHaskell.Types where
 
 data Type
-    = TypeAny
-    | TypeSome Int
+    = TypeSome Int
     | TypeInt
     | TypeBool
     | TypeAbstr Type Type

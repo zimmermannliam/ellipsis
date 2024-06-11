@@ -13,7 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "daily/2024-06-03.md",
+                "file": "daily/2024-05-30.md",
                 "mode": "source",
                 "source": false
               }
@@ -85,7 +85,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "daily/2024-06-03.md",
+                "file": "daily/2024-05-30.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -102,7 +102,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "daily/2024-06-03.md",
+                "file": "daily/2024-05-30.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -125,7 +125,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "daily/2024-06-03.md"
+                "file": "daily/2024-05-30.md"
               }
             }
           }
@@ -148,6 +148,7 @@
   },
   "active": "82d9bffdbd6f1e99",
   "lastOpenFiles": [
+    "daily/2024-06-03.md",
     "daily/2024-05-09.md",
     "daily/2024-05-06.md",
     "daily/2024-05-13.md",
@@ -155,7 +156,6 @@
     "daily/2024-05-20.md",
     "daily/2024-05-28.md",
     "daily/2024-05-30.md",
-    "daily/2024-06-03.md",
     "Todo.md",
     "Favorites.md",
     "Meeting 2024-04-22.md",

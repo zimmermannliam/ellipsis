@@ -14,7 +14,7 @@ import EllipLang.MHSPrelude
 import GenericHelper (everywhereUntil, mkMMMaybeT, gzipM, mkQQ, mkQQMaybe, gzipQ, hoistMaybe, mapWithIdx)
 
 import Data.Generics 
-import Control.Monad.State (State, evalState, runState, MonadState(put, get))
+import Control.Monad.State (State, evalState, runState, MonadState(put, get), modify)
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import Control.Monad (mzero, guard)
 import Control.Monad.Trans (lift)
@@ -215,47 +215,47 @@ tInterpolateGo (ElliGroup l) (ElliGroup r) = do
     lift $ put (id+1, er:rs)
     return $ Var $ makeElliAlias er
 
--- [] ... [x1 ... xn]
-tInterpolateGo (Value Empty) (Ellipsis rl rr) = do
-    s@(id,rs) <- lift get
-    let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' rl rr) (id,[])
-    r' <- hoistMaybe r
-    let newRange = ElliRange { ed_t = ElliExpr $ Var "inits" `App` r'
-                             , ed_ie = Value (Con 0)
-                             , ed_ib = Value (Con 0)
-                             , ed_id = id+idr+1
-                             }
-    lift $ put (id+idr+1, newRange:rs)
-    return $ Var $ makeElliAlias newRange
-
--- [x1...xn] ... []
-tInterpolateGo (Ellipsis ll lr) (Value Empty) = do
-    s@(id,rs) <- lift get
-    let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' ll lr) (id,[])
-    r' <- hoistMaybe r
-    let newRange = ElliRange { ed_t = ElliExpr $ Var "reverse" `App` Var "inits" `App` r'
-                             , ed_ie = Value (Con 0)
-                             , ed_ib = Value (Con 0)
-                             , ed_id = id+idr+1
-                             }
-    lift $ put (id+idr+1, newRange:rs)
-    return $ Var $ makeElliAlias newRange
-
 -- (el1:...:elk:[], [er1, ..., er2])
-tInterpolateGo eli@(Cons el1 _) ell@(Ellipsis er1 er2) = do
+tInterpolateGo elist@(Cons el1 _) ell@(Ellipsis er1 er2) = do
     s@(id,rs) <- lift get
     let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' er1 er2) (id,[])
     r' <- hoistMaybe r
-    eli' <- hoistMaybe $ unConsSafe eli
+    elist' <- hoistMaybe $ unConsSafe elist
+    (e_head, _) <- hoistMaybe $ uncons elist'
+    (_, e_tail) <- hoistMaybe $ unsnoc elist'
+    if e_head == er1
+        then do
+            let newRange = ElliRange { ed_t = ElliExpr $ 
+                Var "drop" `App` Value (Con $ length elist') `App` (Var "inits" `App` r')
+                                    , ed_ie = Value (Con 0)
+                                    , ed_ib = Value (Con 0)
+                                    , ed_id = id+idr+1
+                                    }
+            lift $ put (id+idr+1, newRange:rs)
+            return $ Var $ makeElliAlias newRange
+    else if e_tail == er2
+        then do
+            let newRange = ElliRange { ed_t = ElliExpr $ 
+                Var "drop" `App` Value (Con $ length elist') `App` (Var "reverse") `App` (Var "tails" `App` r')
+                                    , ed_ie = Value (Con 0)
+                                    , ed_ib = Value (Con 0)
+                                    , ed_id = id+idr+1
+                                    }
+            lift $ put (id+idr+1, newRange:rs)
+            return $ Var $ makeElliAlias newRange
+    else mzero
 
-    let newRange = ElliRange { ed_t = ElliExpr $ 
-        Var "drop" `App` Value (Con $ length eli') `App` (Var "inits" `App` r')
-                             , ed_ie = Value (Con 0)
-                             , ed_ib = Value (Con 0)
-                             , ed_id = id+idr+1
-                             }
-    lift $ put (id+idr+1, newRange:rs)
-    return $ Var $ makeElliAlias newRange
+
+-- (el1:...:elk:[], [er1, ..., er2])
+tInterpolateGo ell@(Ellipsis er1 er2) elist@(Cons el1 _) = do
+    v <- tInterpolateGo elist ell
+    lift $ modify (second go)
+    return v
+  where
+    go :: [ElliRange] -> [ElliRange]
+    go rs = 
+        let Just (rest, rlast@ElliRange{ed_t = ElliExpr e}) = unsnoc rs
+        in rest ++ [rlast { ed_t = ElliExpr (Var "reverse" `App` e) }]
 
 {-
     -- (er1, er2) ~> er_inner

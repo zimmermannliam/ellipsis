@@ -235,6 +235,10 @@ groupByNeighbor eq [x1, ..., xn] = foldl ppa [[x1]] $
 
 initselli [x1, ..., xn] = [ [], [x1], ..., [x1, ..., xn]]
 
+tailselli [x1, ..., xn] = [[x1, ..., xn], ..., [xn], []]
+
+tailsR [x1, ..., xn] = [[], [xn], ..., [x1, ..., xn]]
+
 
 -- no indicesOfChangeBy
 
@@ -246,7 +250,7 @@ groupBy eq [x1, ..., xn] = case [1] ++ (indicesOfChangeBy eq [x1, ..., xn]) ++ [
         to   [x{k{m-1}}, ..., x{km}]
 }-}
 
--- tails [x1, ..., xn] = [ [x1, ..., xn], ..., [] ]
+-- tails [x1, ..., xn] = [ [x1, ..., xn], ..., [xn], [] ]
 
 ------------------------------------------------------------------------
 --
@@ -287,12 +291,12 @@ notElem y [x1, ..., xn] = (y /= x1) && ... && (y /= xn) && True
 -- searching with a predicate
 ------------------------------------
 
-find p x = head (filterelli p x)
+find p x = head (filter p x)
 
-filterelli p [x1, ..., xn] 
+filter p [x1, ..., xn] 
     = (if p x1 then [x1] else []) ++ ... ++ (if p xn then [xn] else []) ++ []
 
-filterelli2 p [x1, ..., xn] = foldr cat [] $
+filter2 p [x1, ..., xn] = foldr cat [] $
     from if p x1 then [x1] else []
     to   if p xn then [xn] else []
 
@@ -328,27 +332,41 @@ zipWith f [x1, ..., xn] [y1, ..., ym] = [f x1 y1, ..., f xn ym]
 
 --    , if x3 `elem` [x1, x2]          then [] else [x3]
 
-nub3 [x1, ..., xn] = foldr cat []
-    [ x1
+nub [x1, ..., xn] = concat
+    [ [x1]
     , if x2 `elem` [x1]              then [] else [x2]
     , ...
     , if xn `elem` [x1, ..., x{n-1}] then [] else [xn]
     ]
 
+{-
 nub2 [x1, ..., xn] = 
     (if x1 `elem` []                then [] else [x1])
     ++ ... ++
     (if xn `elem` [x1, ..., x{n-1}] then [] else [xn])
     ++ []
+    -}
 
+{-
 nub [x1, ..., xn] = foldr cat [] $
     from if x1 `elem` []                then [] else [x1]
     to   if xn `elem` [x1, ..., x{n-1}] then [] else [xn]
+    -}
 
 delete y [x1, ..., xn] = case elemIndices1 y [x1, ..., xn] of {
     []      -> [x1, ..., xn];
     k:ks    -> [x1, ..., x{k-1}, x{k+1}, ..., xn];
 }
+
+-- doesn't work
+
+deleteAll y [x1, ..., xn] = case elemIndices1 y [x1, ..., xn] of {
+    []            -> [x1, ..., xn];
+    [k1, ..., km] -> [x{k1+1},      ..., x{k2-1}] 
+                  ++ ... 
+                  ++ [x{k{m-1}+1},  ..., x{km-1}];
+    }
+
     
 -- \\
 
@@ -395,7 +413,7 @@ lookup2 needlek [k1, ..., km] [v1, ..., vn] =
     i:is    -> v{i};
 }
 
-fac n = n * ... * 1
+fac n = n * (n-1) * ... * 1
 
 mapR f [x1, ..., xn] = [f xn, ..., f x1]
 
@@ -468,9 +486,9 @@ quicksort list =
     let go = \xs -> case xs of {
         []              -> [];
         [x1, ..., xn]   -> 
-            (go $ filterelli (geq x1) [x2, ..., xn])
+            (go $ filter (geq x1) [x2, ..., xn])
             ++ [x1]
-            ++ (go $ filterelli (lt x1) [x2, ..., xn]);
+            ++ (go $ filter (lt x1) [x2, ..., xn]);
     }
     in go list
 
@@ -481,3 +499,5 @@ sort [x1, ..., xn] =
     , ...
     , n `kthSmallest` [x1, ..., xn]
     ]
+
+allEq [x1, ..., xn] = x2 == x1 && ... && xn == x1 && True

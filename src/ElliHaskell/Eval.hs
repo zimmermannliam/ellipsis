@@ -2,16 +2,21 @@ module ElliHaskell.Eval where
 
 import ElliHaskell.Syntax
 import ElliHaskell.Types
+import ElliHaskell.Pretty.Expr
 
-import Data.Map (union, empty)
+import Data.Map (union, empty, insert)
+-- import qualified Data.Map as Map
 import Control.Monad.Trans.Except
 import Control.Monad.Reader
+
+
+import Debug.Trace
 
 type Evaluation a = ExceptT ErrEval (Reader Env) a
 
 data ErrEval
-    = ErrEBound Name
-    | ErrECxt ErrEval ErrEval
+    = ErrEBound Env Name
+    | ErrEInfo Info ErrEval
     | ErrENotVal Expr
     | ErrENotClosure Expr Expr
     | ErrENoMatch [Pattern] Val
@@ -35,39 +40,31 @@ eval e = do
 evalExpr :: Expr -> Evaluation Val
 
 -- E |- v => val
-evalExpr (Var _ v)    = do
+evalExpr (Var i v)    = do
     env <- ask
     case env `getVal` v of
 
         -- E(v) = val
         Just val    -> return val
-        Nothing     -> throwE (ErrEBound v)
+        Nothing     -> throwE $ ErrEInfo i (ErrEBound env v)
 
 -- E |- \pat -> e => (E, pat, e)
 evalExpr (Abstr _ pat e) = do
     env <- ask
-    return $ Closure blank env pat e
+    return $ Closure blank (pat, e) env empty
 
 -- E |- e1 e2 => val
 evalExpr e@(App _ e1 e2) = do
-    val <- evalExpr e1
-    case val of
-        -- E |- e1 => (E', pat', e')
-        Closure _ env' pat' e' -> do
+    val1 <- evalExpr e1
+    case val1 of
+        -- E |- e1 => (alt, E', E'')
+        Closure _ alt env' env'' -> do
+            -- E |- e2 => val2
+            val2 <- evalExpr e2
 
-            -- E |- e2 => val'
-            val' <- evalExpr e2
-
-            -- val' |- pat' => E_pat
-            env_pat <- maybe 
-                (throwE $ ErrENoMatch [pat'] val') 
-                return 
-                (patternmatch val' pat')
-
-            -- E_pat + E' |- e' => val
-            local (env_pat `union` env' `union`) $ evalExpr e'
-
-        _                  -> throwE $ ErrENotClosure e val
+            -- E' + rec(E'', val2) |- alt => val
+            local (const ((recEnv env'') `union` env')) $ evalAlts val2 [alt]
+        _                  -> throwE $ ErrENotClosure e val1
 
 evalExpr c@(Con _ _) = return c
 
@@ -88,7 +85,28 @@ evalExpr (Case _ e alts) = do
     val <- evalExpr e
     evalAlts val alts
 
+-- E |- let v = e1 in e2 => val2
+evalExpr (Let _ pat e1 e2) = do
+    -- E |- e1 => val1
+    val1 <- evalExpr e1
+
+    -- E,val1 |- pat => E'
+    env' <- maybe 
+        (throwE $ ErrENoMatch [pat] val1)
+        return
+        (patternmatch val1 pat)
+
+    -- E + rec E' |- e2 => val2
+    local (union (recEnv env')) $ evalExpr e2
+
 evalExpr e              = throwE (ErrENotImpl e)
+
+recEnv :: Env -> Env
+recEnv env = fmap (rec' env) env
+
+rec' :: Env -> Val -> Val
+rec' env (Closure i alt env' _) = Closure i alt env' env
+rec' _   val                    = val
 
 evalOp :: Val -> Op -> Val -> Either ErrEval Val
 evalOp (Con _ (I i1)) Add (Con _ (I i2)) = Right $ Con blank $ I $ i1 + i2

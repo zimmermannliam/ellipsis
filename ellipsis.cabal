@@ -116,6 +116,9 @@ common ellihaskell
                     mtl,
                     transformers
     ghc-options: -Wall
+    other-modules:
+        ElliHaskell.Pretty.Expr
+        ElliHaskell.Pretty.Err
 
 executable ehs
     import:         ellihaskell

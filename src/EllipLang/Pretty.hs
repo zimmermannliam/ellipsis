@@ -153,7 +153,7 @@ ppVal :: Val -> String
 ppVal (Con i)       = if i >= 0 then show i else "(" ++ show i ++ ")"
 ppVal v@(VCons _ _)   = "[" ++ ppVCons v ++ "]"
 ppVal Empty       = "[]"
-ppVal (Closure n t e)   = "CLOSURE"-- "CLOSURE( " ++ ppEnv e ++ "|-" ++ pp (Abstr n t) ++ ")"
+ppVal (Closure n t e)   = "CLOSURE " ++ pp t
 ppVal (FreeVar n)   = n
 ppVal (VPair v1 v2) = "(" ++ ppVal v1 ++ ", " ++ ppVal v2 ++ ")"
 ppVal (Boolean b)   = if b then "True" else "False"

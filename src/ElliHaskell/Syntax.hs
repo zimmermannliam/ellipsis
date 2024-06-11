@@ -1,8 +1,9 @@
 module ElliHaskell.Syntax where
 
-import ElliHaskell.Types (Type (TypeInt, TypeBool, TypeAny, TypeAbstr, TypeList, TypeSome))
+import ElliHaskell.Types (Type (..))
 
 import Data.Map (Map, fromList, insert, (!?), (!))
+import Text.Megaparsec (SourcePos, initialPos)
 
 ------------------------------------------------------------------------
 --
@@ -15,6 +16,7 @@ data Stmt
     | StmtEval Expr
     | StmtType Expr
     | StmtQuit
+    | StmtUnsafe Expr
     deriving (Eq, Show)
 
 data Decl = Decl Info Name Type [([Pattern], Expr)]
@@ -25,11 +27,12 @@ data Expr
     | App Info Expr Expr
     | Abstr Info Pattern Expr
     | Con Info Constant
-    | Closure Info Env Pattern Expr
+    | Closure Info Alt Env Env
     | Ifx Info Expr Op Expr
     | TypeSig Info Type Expr
     | List Info [Expr]
     | Case Info Expr [Alt]
+    | Let Info Pattern Expr Expr
     deriving (Eq, Show)
 
 data Constant
@@ -45,11 +48,11 @@ data Pattern
 
 type Val    = Expr
 type Name   = String
-type Info   = Int
+type Info   = SourcePos
 type Alt    = (Pattern, Expr)
 
 blank :: Info
-blank = 0
+blank = initialPos ""
 
 ------------------------------------------------------------------------
 --
@@ -145,14 +148,14 @@ ops =   fromList
                     , opinfo_ifxname="=="
                     , opinfo_prefixname="(==)"
                     , opinfo_label="equal-to"
-                    , opinfo_type=TypeAbstr TypeAny (TypeAbstr TypeAny TypeBool)
+                    , opinfo_type=TypeAbstr (TypeSome 1) (TypeAbstr (TypeSome 1) TypeBool)
                     , opinfo_assoc=AssocN
                     })
     , (Neq, OpInfo  { opinfo_prec=2
                     , opinfo_ifxname="/="
                     , opinfo_prefixname="(/=)"
                     , opinfo_label="not-equal-to"
-                    , opinfo_type=TypeAbstr TypeAny (TypeAbstr TypeAny TypeBool)
+                    , opinfo_type=TypeAbstr (TypeSome 1) (TypeAbstr (TypeSome 1) TypeBool)
                     , opinfo_assoc=AssocN
                     })
     , (Lt, OpInfo  { opinfo_prec=2
@@ -201,7 +204,7 @@ ops =   fromList
                      , opinfo_ifxname=""
                      , opinfo_prefixname=""
                      , opinfo_label="infix function"
-                     , opinfo_type=TypeAbstr TypeAny (TypeAbstr TypeAny TypeAny)
+                     , opinfo_type=TypeAbstr (TypeSome 1) (TypeAbstr (TypeSome 2) (TypeSome 3))
                      , opinfo_assoc=AssocL
                      })
     , (Cons, OpInfo{ opinfo_prec=100

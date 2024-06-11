@@ -1,0 +1,331 @@
+
+Using the inference rules in Figure \ref{fig:trans-infer-traversal},
+the expression interpolated from $($\zlst[mathescape]!x1 + y1!$)$ to $($\zlst[mathescape]!xk + yk!$)$
+is the interpolation from \zlst!x1! to \zlst!xk!
+plus the interpolation from \zlst!y1! to \zlst!yk!:
+\[
+\JUDGE
+    {\ELL{(\zlst[mathescape]!x1 + y1!)}{(\zlst[mathescape]!xk + yk!)}}
+    {(\ELL{\zlst[mathescape]!x1!}{\zlst[mathescape]!xk!})
+    \zlst!\ +\ !(\ELL{\zlst[mathescape]!y1!}{\zlst[mathescape]!yk!})}
+\]
+In addition, judgements produce sets of variable-list pairs, which are union-ed:
+\begin{mathpar}
+\JUDGE
+    {(\ELL{\zlst!x1!}{\zlst!xk!})}
+    {
+        \jpair{\zlst!a!}{ \SET{\spair{a}{\zlst!slice x 1 k!}}}
+    }
+\and
+\JUDGE
+    {(\ELL{\zlst!y1!}{\zlst!yk!})}
+    {
+        \jpair{\zlst!b!}{ \SET{\spair{b}{\zlst!slice y 1 k!}}}
+    }
+\end{mathpar}
+
+The first sub-expression interpolation,
+$(\ELL{\zlst[mathescape]!x1!}{\zlst[mathescape]!xk!})$
+or ``the interpolation from \zlst!x1! to \zlst!xk!'',
+is understood by the translation rules to be a list of the elements between
+\zlst!x1! and \zlst!xk!.
+We return a fresh variable, \zlst!a!,
+and we produce the list of \zlst!x!s between \zlst!1! and \zlst!k!:
+\zlst[mathescape]![x1, x2, $\metaell$, x{k-1}, xk]!,
+using the \zlst!slice! function: \zlst!slice x 1 k!.
+\[
+\JUDGE
+    {(\ELL{\zlst[mathescape]!x1!}{\zlst[mathescape]!xk!})}
+    {\jpair{\zlst!a!}{\SET{\spair{\zlst!a!}{\zlst!slice x 1 k!}}}}
+\]
+
+The second sub-expression interpolation, 
+$(\ELL{\zlst[mathescape]!y1!}{\zlst[mathescape]!yk!})$,
+works much the same way:
+
+\[
+\JUDGE
+    {(\ELL{\zlst[mathescape]!y1!}{\zlst[mathescape]!yk!})}
+    {\jpair{\zlst!b!}{\SET{\spair{\zlst!b!}{\zlst!slice y 1 k!}}}}
+\]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{mathpar}
+\inferrule[]
+{
+\JUDGE{\ELL{\zlst!x1!}{\zlst!xk!}}{\res{(A)}}
+\\
+\JUDGE{\ELL{\zlst!y1!}{\zlst!yk!}}{\res{(B)}}
+}
+{
+\JUDGE{\ELL{(\zlst!x1+y1!)}{(\zlst!xk+yk!)}}{\jpair{\expr{(A)} \zlst!+! \expr{(B)}}{\slices{(A)} \cup \slices{(B)}}}
+}
+\end{mathpar}
+
+
+
+As another example, take the \zlst!filter! function.
+\zlst!filter! takes a function \zlst!p! of type \zlst!a -> Bool!
+and a list of type \zlst![a]!,
+and produces a list of type \zlst![a]!,
+which contains only the elements of the list that ``passed'' (returned \zlst!True! for) \zlst!p!.
+In Elli-Haskell, it could be implemented like this:
+\begin{lstlisting}
+filter p [x1, ..., xn] = concat
+    [ if p x1 then [x1] else []
+    , ...
+    , if p xn then [xn] else []
+    ]
+\end{lstlisting}
+The function creates singletons containing passing elements,
+and empty lists for failing elements.
+It then concatenates the lists,
+effectively removing the empty lists and unwrapping the singletons.
+
+\begin{figure}[t]
+
+\begin{mathpar}
+\inferrule*[left=Z]
+{
+\inferrule
+}
+{
+\ELL{ \zlst!if p x1 then [x1] else []!}
+    {\zlst!if p xn then [xn] else []! }
+\\
+\rightsquigarrow
+\jpair
+    {\zlst!if a then [b] else []!}
+    {
+        \SET{ \spair{\zlst!a!}{(\zlst!slice x 1 n!)},\;
+        \spair{\zlst!b!}{\zlst!slice x 1 n!}
+        }
+    }
+}
+\end{mathpar}
+
+\caption{Derivation tree for \zlst!filter!}
+\label{fig:filter-tree}
+\end{figure}
+
+To translate the ellipsis expression,
+we need to interpolate between the expressions:
+\begin{mathpar}
+\zlst!if p x1 then [x1] else []!
+\and
+\zlst!if p xn then [xn] else []!
+\end{mathpar}
+
+\begin{align*}
+\end{align*}
+
+% This inference requires slightly more sophistication than nested ellipsis.
+% For instance, the the interpolation of the pair
+% $\ELL{\zlst{[x1, x2, x3]}}{\zlst{[x1, ..., xn]}}$
+% clearly intends to build a list from the first 3 \zlst{x}s to the entire list of \zlst{x}s.
+% However, the nested pair
+% $\ELL{\zlst{[x3, x1, x2]}}{\zlst{[x1, ..., xn]}}$
+% is not meaningful.
+% Some sort of mechanism to check the entire list is necessary.
+
+% One thing immediately noticeable about this inference
+% is that it requires checking the list on the opposite side to the ellipsis. 
+% \lstinline{[x1, x2, x3, x4], ..., [x1, ..., xn]}
+% requires that the left-hand side be checked for the correct order:
+% \lstinline{[x1, x3, x4, x2]} would not be valid against
+% \lstinline{[x1, ..., xn]}.
+% In addition,
+% the structure for each element of the list must be similar.
+% These details are discussed in the implementation section \note{not totally yet}.
+%
+%The inference rules in Figure \ref{fig:trans-cons-elli} show how lists of determined size
+%are interpolated with ellipsis lists.
+
+For instance, the following function is ambiguous:
+\begin{lstlisting}
+buildFromMiddle [x1, ..., xn] =
+    let k = n/2+1  -- Middle element
+    in [[xk], ..., [x1, ..., xn]]
+\end{lstlisting}
+The ambiguity lies in choosing which direction the list will build:
+will the next expression be \zlst![xk, x{k+1}]!
+or \zlst![x{k-1}, xk]!?
+
+
+
+
+
+
+
+\NOTE{Should I add the below text to the limitations section instead?
+It really has to do with a limitation of my work, not a limitation of ellipsis.
+I am actually working on a type-inferred version of mini/elli haskell,
+but it's not done yet and I want to focus on the paper.}
+
+However, this does not catch more complex expressions involving integers,
+for example:
+
+\begin{lstlisting}
+enumerate [x1,...,xn] = [(x1,0),...,(xn,n-1)]
+\end{lstlisting}
+
+A translation of $\ELL{0}{n-1}$ would fail.
+Instead of defining all the arithmetic operators in the translation function, however,
+this could be remedied using simple type inferences.
+For a judgement $\ELL{\exprx{1}}{\exprx{2}}$,
+if $\exprx{1} : Int$ and $\exprx{2} : Int$, plus
+$\exprx{} \notin \exprx{1}$ and
+$\exprx{} \notin \exprx{2}$,
+a range could be made between $\exprx{1}$ and $\exprx{2}$.
+
+The inference would have to avoid Elli-Haskell expressions.
+Otherwise, any list elements for integer lists could be unintentionally enumerated together,
+instead of sliced together.
+For example, with the \zlst{addEnumeration'} function:
+
+\begin{lstlisting}
+addEnumeration' [x1,...,xn] = [x1+0,...,xn+(n-1)]
+\end{lstlisting}
+
+\lstinline|addEnumeration'| would be expected to produce the following translation:
+\lstinline|zipWith (+) xs (range 0 (length xs - 1))|,
+not an enumeration between \lstinline|x1+0| and \lstinline|xn+(n-1)|
+(\lstinline|range (x1+0) (xn+(n-1)|).
+
+Correctly:
+
+\begin{lstlisting}
+> addEnumeration' [1,10,15,3]
+[1+0, 10+1, 15+2, 3+3] == [1, 11, 17, 6]
+\end{lstlisting}
+
+Incorrectly:
+
+\begin{lstlisting}
+> addEnumeration' [1,10,15,3]
+[1, 2, 3, 4, 5, 6]
+\end{lstlisting}
+
+
+Additionally, note that the expression \lstinline|x1+0| could be further simplified:
+
+\begin{lstlisting}
+addEnumeration [x1,...,xn] = [x1,...,xn+(n-1)]
+\end{lstlisting}
+
+This requires inference about the identity property of \lstinline|(+)| ($x+0$ or $0+x$).
+This could also be defined for
+\lstinline|div| ($x \lstinline|`div`| 1$),
+\lstinline|(-)| ($x-0$), and
+\lstinline|(*)| ($x*1$ or $1*x$).
+
+\begin{lstlisting}
+divEnumeration1 [x1, ..., xn] = [x1, ..., xn `div` n]  -- [x1 `div` 1, ..., xn `div` n]
+mulEnumeration1 [x1, ..., xn] = [x1, ..., xn * n]  -- [x1 * 1, ..., xn * n]
+subEnumeration1 [x1, ..., xn] = [x1, ..., xn - n]  -- [x1 - 0, ..., xn - n]
+\end{lstlisting}
+
+Presently,
+none of the type checker-enabled features have been implemented in the Elli-Haskell translator.
+\note{This is on my list of extensions}
+However, as a simple solution, \zlst{let} expressions may be used:
+
+\begin{lstlisting}
+rangeNotIncludingB a b = [a, ..., b-1]
+-- becomes
+rangeNotIncludingB a b = let b' = b-1 in [a, ..., b']
+\end{lstlisting}
+\begin{figure}[t]
+    \IMPORTANT{
+\begin{mathpar}
+
+\inferrule[Variable-to-variable]
+    { v_1 \neq v_2 }
+    {\JUDGE
+        {\ELL{v_1}{v_2}}
+        {\jpair
+            {\freshv{}}
+            {\SET{\spair{\freshv{}, \zlst{range\ } v_1 \spc v_2}}}
+        }
+    }
+
+\inferrule[Int-to-int]
+    { int_1 \neq int_2 }
+    {\JUDGE
+        {\ELL{int_1}{int_2}}
+        {\jpair
+            {\freshv{}}
+            {\SET{\spair{\freshv{}, \zlst{range\ } int_1 \spc int_2}}}
+        }
+    }
+
+\inferrule[Variable-to-int]
+    { }
+    {\JUDGE
+        {\ELL{v}{int}}
+        {\jpair
+            {\freshv{}}
+            {\SET{\spair{\freshv{}, \zlst{range\ } v \spc int}}}
+        }
+    }
+
+\inferrule[Int-to-variable]
+    { }
+    {\JUDGE
+        {\ELL{int}{v}}
+        {\jpair
+            {\freshv{}}
+            {\SET{\spair{\freshv{}, \zlst{range\ } int \spc v}}}
+        }
+    }
+
+\end{mathpar}
+}
+
+    \caption{Ranges}
+    \label{fig:trans-range}
+\end{figure}
+
+
+Operations on lists in functional programming often requires unintuitive, myopic recursive definitions
+that define a list element-by-element.
+For example, take the following function \zlst{f}, an operation that takes a list,
+and returns a list of pairs:
+\begin{lstlisting}
+f []            = []
+f [x]           = []
+f (x1:x2:xs)    = (x1, x2):f (x2:xs)
+\end{lstlisting}
+\zlst{f} is a relatively simple function.
+On an empty list, \zlst{f} returns an empty list.
+On a list of a single element, \zlst{f} also returns an empty list.
+On a list of two or more elements,
+\zlst{f} prepends a pair of the first two elements
+onto a recursive call of itself onto a list containing the second element prepended on the rest of the elements.
+
+If you have not yet guessed, \zlst{f} is this function:
+\begin{lstlisting}[mathescape]
+f [x$_1$, ..., x$_n$] = [(x$_1$, x$_2$), (x$_2$, x$_3$), ..., (x$_{n-1}$, x$_n$)]
+\end{lstlisting}
+Also called the neighbors function,
+\zlst{f} pairs adjacent elements in a list.
+It can be used when collecting inversions in a merge sort,
+or when checking a list for monotonicity.
+It could also be implemented using a function composition: \zlst{zip xs (drop 1 xs)}.
+
+The obtuse introduction to the \zlst{neighbors} function was meant
+to illustrate the use of ellipsis in functional programming.
+This paper covers a 

@@ -225,4 +225,11 @@ inits list =
     }
     in go [] list
 
+tails list =
+    let go = \xs -> case xs of {
+        []      -> [];
+        x:xr    -> (x:xr):(go xr);
+    }
+    in go list
+
 not x = if x == True then False else True

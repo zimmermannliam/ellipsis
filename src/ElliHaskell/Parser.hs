@@ -18,6 +18,8 @@ type Parser = Parsec ErrParser String
 keywords :: [String]
 keywords =
     [ "case", "of"
+    , "let", "in"
+    , "if", "then", "else"
     ]
 
 same :: Eq b => (a -> b) -> [a] -> Bool
@@ -55,6 +57,7 @@ pStmt = choice
   [ try $ StmtDecl <$> pDecl
   , try $ StmtEval <$> pExpr
   , pStmtType
+  , pStmtUnsafe
   , StmtQuit <$ symbol ":q"
   ] <* eof
 
@@ -62,6 +65,11 @@ pStmtType :: Parser Stmt
 pStmtType = do
     void $ try $ symbol ":t"
     StmtType <$> pExpr
+  
+pStmtUnsafe :: Parser Stmt
+pStmtUnsafe = do
+  void $ try $ symbol ":u"
+  StmtUnsafe <$> pExpr
 
 ------------------------------------------------------------------------
 --
@@ -85,13 +93,15 @@ pDecl = go >>= unPreDecl
 unPreDecl :: [PreDecl] -> Parser Decl
 unPreDecl (dec:rest) 
     | (TypeDecl v t) <- dec = do
+        pos <- getSourcePos
         rest' <- go v rest
         if same (length . fst) rest'
-            then return $ Decl blank v t rest'
+            then return $ Decl pos v t rest'
             else fail "Not same patterns"
-    | (FunDecl v _ _) <- dec = do
+    | (FunDecl v _ _) <- dec = undefined {-do
         rest' <- go v (dec:rest)
-        return $ Decl blank v TypeAny rest'
+        pos <- getSourcePos
+        return $ Decl pos v TypeAny rest'-}
   where
     go :: String -> [PreDecl] -> Parser [([Pattern], Expr)]
     go _ ((TypeDecl _ _):_)        = fail "type decl too late"
@@ -180,6 +190,8 @@ pTerm = choice
     , paren pExpr
     , pList
     , pCase
+    , pIfThenElse
+    , pLet
     ]
 
 pCon :: Parser Constant
@@ -194,6 +206,11 @@ pCon = (I <$> pInt) <|> (B <$> pBool)
         <|> False <$ symbol "False"
         <?> "boolean"
 
+pVar :: Parser Expr
+pVar = do
+    pos <- getSourcePos
+    Var pos <$> pIdentifier
+
 pIdentifier :: Parser Name
 pIdentifier = lexeme $ try $ ident >>= check
   where
@@ -206,10 +223,12 @@ pIdentifier = lexeme $ try $ ident >>= check
 
 pAbstr :: Parser Expr
 pAbstr = do
+    pos <- getSourcePos
     void $ symbol "\\"
-    pat <- pPattern
+    pats <- some $ pPattern
     void $ lexeme $ symbol "->"
-    Abstr blank pat <$> pExpr
+    e <- pExpr
+    return $ foldr (\l r -> Abstr pos l r) e pats
 
 pList :: Parser Expr
 pList = between (symbol "[") (symbol "]") $ List blank <$> go
@@ -258,6 +277,26 @@ pCase = do
         void (symbol "->")
         e <- pExpr
         return (pat, e)
+
+pIfThenElse :: Parser Expr
+pIfThenElse = do
+    void (symbol "if")
+    e1 <- pExpr
+    void (symbol "then")
+    e2 <- pExpr
+    void (symbol "else")
+    e3 <- pExpr
+    return $ Case blank e1 [(ConPat (B True), e2), (ConPat (B False), e3)]
+
+pLet :: Parser Expr
+pLet = do
+  void (symbol "let")
+  pat <- pPattern
+  void (symbol "=")
+  e1 <- pExpr
+  void (symbol "in")
+  e2 <- pExpr
+  return $ Let blank pat e1 e2
 
 ------------------------------------------------------------------------
 --
