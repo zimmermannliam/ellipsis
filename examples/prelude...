@@ -233,3 +233,17 @@ tails list =
     in go list
 
 not x = if x == True then False else True
+
+indices is xs = 
+    let go = \is -> case is of {
+        []      -> [];
+        i:ir    -> (subscript xs (i-1)):(go ir);
+    }
+    in go is
+
+pow x n = if x == 0 then 0 else
+    let go = \i -> case i of {
+        0   -> 1;
+        ii  -> x * (go (ii-1));
+    }
+    in go n

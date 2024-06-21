@@ -313,6 +313,7 @@ opToFixity s = fromMaybe FixLeft (fixmap Map.!? s)
         , ("`mod`",     FixLeft)
         , ("-",         FixLeft)
         , ("+",         FixLeft)
+        , ("^",         FixLeft)
         , (":",         FixRight)
         , ("==",        FixLeft)
         , ("/=",        FixLeft)
@@ -355,7 +356,8 @@ operatorTable =
     [ [ InfixL ifx
       , app
       ] -- 9
-    , [] -- 8
+    , [ binaryR "^" (Op $ VarOp "pow")
+    ] -- 8
     , [ binaryL "*" (opToBinExpr "*")
       , binaryL "`div`" (opToBinExpr "`div`")
       , binaryL "`mod`" (opToBinExpr "`mod`")
