@@ -33,6 +33,9 @@ exListV, exList2V, exList3V, exList4V, exList5V, exList6V :: Val
 -- Example functions
 ------------------------------------------------------------------------
 
+succ' :: Expr
+succ' = x <.> Op Add x (inte 1)
+
 reverse' :: Expr
 reverse' = xs <.> case1 xs (
     (x, 1) <..> (x, n) ==> (x!n) <...> (x!.1)

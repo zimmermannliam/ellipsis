@@ -135,7 +135,6 @@ executable ehs
 
 
     
-
 library ElliHaskell
     import:         ellihaskell
     exposed-modules:
@@ -177,3 +176,14 @@ test-suite genericTest
                     mtl,
                     syb,
                     transformers
+
+test-suite fullTest
+    hs-source-dirs: tests
+    type:           exitcode-stdio-1.0
+    main-is:        FullTest.hs
+    build-depends:  base ^>=4.17.2.1,
+                    EllipLang,
+                    HUnit,
+                    containers,
+                    megaparsec,
+                    text

@@ -112,7 +112,7 @@ l <:> r = Cons l r
 infixr 9 <:>
 
 (<++>) :: Expr -> Expr -> Expr
-l <++> r = Var "(++)" `App` l `App` r
+l <++> r = Var "cat" `App` l `App` r
 
 empt :: Expr
 empt = Value Empty

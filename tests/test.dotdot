@@ -1,0 +1,99 @@
+list1 = [2,1,4,3,5]
+
+list2 = [6,7,8,9,10]
+
+list3 = [4,3,5,6,4]
+
+------------------------------------------------------------------------
+-- Testing functions
+------------------------------------------------------------------------
+
+catt [x1, ..., xn] [y1, ..., ym] = [x1, ..., xn, y1, ..., ym]
+
+lengtht [x1, ..., xn] = n
+
+ktht k [x1, ..., xn] = xk
+
+reverset [x1, ..., xn] = [xn, ..., x1]
+
+mapt f [x1, ..., xn] = [f x1, ..., f xn]
+
+zipWitht f [x1, ..., xn] [y1, ..., ym] = [f x1 y1, ..., f xn ym]
+
+zipWith3t f [x1, ..., xn] [y1, ..., ym] [z1, ..., zk]
+    = [f x1 y1 z1, ..., f xn ym zk]
+
+foldl1t f [x1, ..., xn] = x1 `f` ... `f` xn
+
+foldr1t f [x1, ..., xn] = x1 `f` (... `f` xn)
+
+foldlt f z [x1, ..., xn] = (...(z `f` x1) `f` ...) `f` xn
+
+foldrt f z [x1, ..., xn] = (x1 `f` (... `f` (xn `f` z)))
+
+initst l = case l of {
+    []              -> [[]];
+    [x1, ..., xn]   -> [[], [x1], ..., [x1, ..., xn]];
+}
+
+tailst l = case l of {
+    []              -> [[]];
+    [x1, ..., xn]   -> [[x1, ..., xn], ..., [xn], []];
+}
+
+taket k [x1, ..., xn] = [x1, ..., xk]
+
+dropt k [x1, ..., xn] = [x{k+1}, ..., xn]
+
+ranget i j = [i, ..., j]
+
+slicet [x1, ..., xn] i j = [xi, ..., xj]
+
+removet k [x1, ..., xn] = [x1, ..., x{k-1}, x{k+1}, ..., xn]
+
+insertAtt k y [x1, ..., xn] = [x1, ..., xk, y, x{k+1}, ..., xn]
+
+replacet k y [x1, ..., xn] = [x1, ..., x{k-1}, y, x{k+1}, ..., xn]
+
+appendt y [x1, ..., xn] = [x1, ..., xn, y]
+
+prependt y [x1, ..., xn] = [y, x1, ..., xn]
+
+zipt [x1, ..., xn] [y1, ..., ym] = [(x1, y1), ..., (xn, ym)]
+
+fact n = case n of {
+    1   -> 1;
+    n   -> n * (n-1) * ... * 1;
+}
+
+pt n = case n of {
+    1   -> 1;
+    n   -> 1 + 2^2 + ... + n^2;
+}
+
+concatt [x1, ..., xn] = x1 ++ ... ++ xn ++ []
+
+concatMapt f [x1, ..., xn] = f x1 ++ ... ++ f xn ++ []
+
+allt p [x1, ..., xn] = p x1 && ... && p xn && True
+
+anyt p [x1, ..., xn] = p x1 || ... || p xn || False
+
+maximumt [x1, ..., xn] = x1 `max` ... `max` xn
+
+minimumt [x1, ..., xn] = x1 `min` ... `min` xn
+
+sumt [x1, ..., xn] = 0 + x1 + ... + xn
+
+filtert p [x1, ..., xn] = (if p x1 then [x1] else [])
+                       ++ ...
+                       ++ (if p xn then [xn] else [])
+                       ++ []
+
+------------------------------------------------------------------------
+-- Extra functions
+------------------------------------------------------------------------
+
+sub a b = a - b
+
+isEven x = (x `mod` 2) == 0

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiLineStrings #-}
+
 import Debug.Trace
 import Data.Function ((&))
 import Data.Foldable (Foldable)
@@ -261,3 +263,8 @@ inits' xs =
         (x:xs)  -> let now = prev ++ [x] in now:go now xs;
     }
     in []:go [] xs
+
+st = """
+hello my name is
+jeff !
+"""
