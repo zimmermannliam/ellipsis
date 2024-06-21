@@ -13,13 +13,26 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "daily/2024-05-30.md",
+                "file": "daily/2024-06-14.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
+            "id": "ca1a3bdf17826cf3",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "daily/2024-06-17.md",
                 "mode": "source",
                 "source": false
               }
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -85,7 +98,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "daily/2024-05-30.md",
+                "file": "daily/2024-06-17.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -102,7 +115,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "daily/2024-05-30.md",
+                "file": "daily/2024-06-17.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -125,7 +138,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "daily/2024-05-30.md"
+                "file": "daily/2024-06-17.md"
               }
             }
           }
@@ -146,8 +159,11 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "82d9bffdbd6f1e99",
+  "active": "ca1a3bdf17826cf3",
   "lastOpenFiles": [
+    "daily/2024-06-17.md",
+    "daily/2024-05-30.md",
+    "daily/2024-06-14.md",
     "daily/2024-06-03.md",
     "daily/2024-05-09.md",
     "daily/2024-05-06.md",
@@ -155,7 +171,6 @@
     "daily/2024-05-14.md",
     "daily/2024-05-20.md",
     "daily/2024-05-28.md",
-    "daily/2024-05-30.md",
     "Todo.md",
     "Favorites.md",
     "Meeting 2024-04-22.md",
@@ -175,8 +190,6 @@
     "daily/2024-04-16.md",
     "daily/2024-04-11.md",
     "daily/2024-04-09.md",
-    "Untitled.md",
-    "daily/2024-04-08.md",
     "New Text Document.txt",
     "daily"
   ]

@@ -300,32 +300,469 @@ rangeNotIncludingB a b = let b' = b-1 in [a, ..., b']
 \end{figure}
 
 
-Operations on lists in functional programming often requires unintuitive, myopic recursive definitions
-that define a list element-by-element.
-For example, take the following function \zlst{f}, an operation that takes a list,
-and returns a list of pairs:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+In the ranges section,
+expressions that are obviously integers can be made into a range.
+This is done without type-checking, instead using
+integer constants, variables, and integer operators like
+\zlst!+!, \zlst!-!, \zlst!*!, \zlst!`div`!, and \zlst!`mod`!
+to infer that something is an integer.
+
+However, there is a strange case that is created from this approach.
+Take this example function \zlst!f!:
 \begin{lstlisting}
-f []            = []
-f [x]           = []
-f (x1:x2:xs)    = (x1, x2):f (x2:xs)
+f i j = [1000*i, ..., 1000*j]
 \end{lstlisting}
-\zlst{f} is a relatively simple function.
-On an empty list, \zlst{f} returns an empty list.
-On a list of a single element, \zlst{f} also returns an empty list.
-On a list of two or more elements,
-\zlst{f} prepends a pair of the first two elements
-onto a recursive call of itself onto a list containing the second element prepended on the rest of the elements.
-
-If you have not yet guessed, \zlst{f} is this function:
+In this case, a range is created between
+\zlst!1000*i! and \zlst!1000*j!.
+If \zlst!f 1 2! were to be called,
+\zlst!i! would be \zlst!1! and \zlst!j! would be \zlst!2!,
+and the following range of integers would be created:
 \begin{lstlisting}[mathescape]
-f [x$_1$, ..., x$_n$] = [(x$_1$, x$_2$), (x$_2$, x$_3$), ..., (x$_{n-1}$, x$_n$)]
+[1000, 1001, 1002, $\metaell$, 1998, 1999, 2000]
 \end{lstlisting}
-Also called the neighbors function,
-\zlst{f} pairs adjacent elements in a list.
-It can be used when collecting inversions in a merge sort,
-or when checking a list for monotonicity.
-It could also be implemented using a function composition: \zlst{zip xs (drop 1 xs)}.
 
-The obtuse introduction to the \zlst{neighbors} function was meant
-to illustrate the use of ellipsis in functional programming.
-This paper covers a 
+However, if instead a similar function \zlst!g! were defined using a helper function \zlst!mulThousand!:
+\begin{lstlisting}
+mulThousaund x = 1000 * x
+
+g i j = [mulThousand i, ..., mulThousand j]
+\end{lstlisting}
+This would output the following list:
+\begin{lstlisting}
+[1000, 2000]
+\end{lstlisting}
+
+This flaw can be alleviated by using type inference.
+Assuming some type context $\Gamma$ was kept up in the translation,
+the following inference rule could be used for ranges:
+\begin{mathpar}
+\inferrule[Ranges]
+{
+\Gamma \vdash \expr{l} : int
+\\
+\Gamma \vdash \expr{r} : int
+\\
+\expr{l} \neq \expr{r}
+}
+{
+%
+\JUDGE
+{
+    \Gamma \vdash \ELL{\expr{l}}{\expr{r}}
+}
+{
+    \jpair
+    {
+        \freshv{}
+    }
+    {
+        \spair
+        {
+            \freshv{}
+        }
+        {
+            \zlst!(range\ !
+            \expr{l}
+            \spc
+            \expr{r}
+            \zlst!)!
+        }
+    }
+}
+%
+}
+\end{mathpar}
+
+Extended expressions would not be included in ranges.
+This is to prevent list elements from creating ranges instead of slices:
+For a list of integers \zlst!x!s,
+\zlst![x1, ..., xk]! should mean ``elements of list \zlst!x!s from \zlst!1! to \zlst!k!'',
+not ``enumeration between the values at \zlst!x1! and \zlst!xk!''.
+
+Using the aforementioned inference rules,
+\zlst!f 1 2! and \zlst!g 1 2! would both output the same result:
+\begin{lstlisting}[mathescape]
+[1000, 1001, 1002, $\metaell$, 1998, 1999, 2000]
+\end{lstlisting}
+
+This is considered the correct result due to its similarity to Haskell 98's
+\zlst!enumFromTo! operator.
+However, it is really somewhat ambiguous as to whether it should evaluate to
+\zlst[mathescape]![1000*i, (1000*i)+1, (1000*i)+2, $\metaell$, 1000*j]!
+or
+\zlst[mathescape]![1000*i, 1000*(i+1), 1000*(i+2), $\metaell$, 1000*j]!.
+This is discussed further in Section \ref{sequences}.
+
+Elli-Haskell does not address sequence-building, which can lead to unintuitive results.
+For example, take the common ellipsis form for the square pyramidal number:
+\[
+1^2 + 2^2 + ... + n^2
+\]
+
+Intuitively, this should expand like this:
+\[
+1^2 + 2^2 + 3^2 + 4^2 + 5^2 + ... + (n-1)^2 + n^2
+\]
+To recurrence relation $f$ where:
+\begin{mathpar}
+n \geq 1
+\and
+f(1) = 1
+\and 
+f(n) = n^2 + f(n-1)
+\end{mathpar}
+
+
+However, in Elli-Haskell's interpretation (assuming power was included as a range operator),
+this would expand to:
+\[
+1^2 + 2^2 + (2^2 + 1) + (2^2 + 2) + ... + (n^2 - 1) + n^2
+\]
+With the recurrence relation $f$ where:
+\begin{mathpar}
+n \geq 1
+\and
+f(1) = 1
+\and
+f(n) = 1 + g(n^2)
+\\
+g(4) = 4
+\and
+g(n) = n + g(n-1)
+\end{mathpar}
+
+\def\mathcat{\zlst!++!}
+
+This is because Elli-Haskell understands sequences like $[y, x_1, ..., x_n]$ to mean
+$[y] \mathcat [x_1, ..., x_n]$, where $\mathcat$ indicates concatenation.
+This is useful: it enables functions like \zlst!append! and \zlst!insert! without much trouble.
+We chose this in Elli-Haskell due to its greater convenience.
+\begin{lstlisting}
+append y [x1, ..., xn] = [y, x1, ..., xn]
+insert y k [x1, ..., xn] = [x1, ..., xk, y, x{k+1}, ..., xn]
+\end{lstlisting}
+
+However, sequences could be used to squash ambiguities instead.
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Begin boilerplate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+Boilerplate cases of translation are shown in Figure \ref{fig:trans-expr-trav}.
+Because Elli-Haskell is based on Mini-Haskell,
+these expressions are nearly identical.
+
+\begin{figure}[H]
+    \centering
+
+\IMPORTANT{
+\begin{mathpar}
+\inferrule[Variable]
+    { }
+    {\JUDGE
+        {\EXPR{v}}
+        {v}
+    }
+
+\inferrule[Abstraction]
+    {\JUDGE{\EXPR{\exprx{}}}{\expr{}}
+    }
+    {\JUDGE
+        {\EXPR{\zlst{\\} v \zlst{\ ->\ } \exprx{}}}
+        {\zlst{\\} v \zlst{\ ->\ } \expr{}}
+    }
+
+\inferrule[Application]
+    {
+        \JUDGE{\EXPR{\exprx{1}}}{\expr{1}}
+        \\
+        \JUDGE{\EXPR{\exprx{2}}}{\expr{2}}
+    }
+    { \JUDGE
+        {\EXPR{\exprx{1}\spc\exprx{2}}}
+        {\expr{1}\spc\expr{2}}
+    }
+
+\inferrule[Let]
+    {
+        \JUDGE{\EXPR{\exprx{1}}}{\expr{1}}
+        \\
+        \JUDGE{\EXPR{\exprx{2}}}{\expr{2}}
+    }
+    {\JUDGE
+        {\EXPR{\zlst{let\ } v \zlst{\ =\ } \exprx{1} \zlst{\ in\ } \exprx{2}}}
+        {\zlst{let\ } v \zlst{\ =\ } \expr{1} \zlst{\ in\ } \expr{2}}
+    }
+% \inferrule[If-then-else]
+%     {
+%         \JUDGE{\EXPR{\exprx{1}}}{\expr{1}}
+%         \\
+%         \JUDGE{\EXPR{\exprx{2}}}{\expr{2}}
+%         \\
+%         \JUDGE{\EXPR{\exprx{3}}}{\expr{3}}
+%     }
+%     {\JUDGE
+%         {\EXPR{
+%             \zlst{if\ } \exprx{1} \zlst{\ then\ } \exprx{2} \zlst{\ else\ } \exprx{3}
+%         }}
+%         {
+%             \zlst{if\ } \expr{1} \zlst{\ then\ } \expr{2} \zlst{\ else\ } \expr{3}
+%         }
+%     }
+\inferrule[Infix]
+    {
+        \JUDGE{\EXPR{\exprx{1}}}{\expr{1}}
+        \\
+        \JUDGE{\EXPR{\exprx{2}}}{\expr{2}}
+    }
+    {\JUDGE
+        {\EXPR{\exprx{1} \oplus \exprx{2}}}
+        {\expr{1} \oplus \expr{2}}
+    }
+    
+\inferrule[Pair]
+    {
+        \JUDGE{\EXPR{\exprx{1}}}{\expr{1}}
+        \\
+        \JUDGE{\EXPR{\exprx{2}}}{\expr{2}}
+    }
+    {\JUDGE
+        {\EXPR{\zlst{(} \exprx{1} \zlst{,\ } \exprx{2} \zlst{)} }}
+        {\zlst{(} \expr{1} \zlst{,\ } \expr{2} \zlst{)} }
+    }
+
+\inferrule[List constructor]
+    {
+    \JUDGE
+        {\EXPR{\exprx{1}}}
+        {\expr{1}}
+    \\    
+    \JUDGE
+        {\EXPR{\exprx{2}}}
+        {\expr{2}}
+    }
+    {
+    \JUDGE
+        {\EXPR{\exprx{1}\zlst{:}\exprx{2}}}
+        {\expr{1}\zlst{:}\expr{2}}
+    }
+
+\inferrule[Constant]
+    { }
+    {\JUDGE
+        {\EXPR{con}}
+        {con}
+    }
+
+\end{mathpar}
+}
+    \caption{Trivial expression translations}
+    \label{fig:trans-expr-trav}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% End boilerplate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Begin case
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\label{trans-case}
+Figure \ref{fig:trans-expr-case} shows the translation of case expressions.
+The target expression, $e$, is translated, along with every $alt$ (shown in section
+\ref{trans-alt}).
+The $\JUDGE{}{}$ operator is overloaded to be a translation between $alt$s as well.
+
+\begin{figure}[H]
+    \centering
+
+\IMPORTANT{
+\begin{mathpar}
+\inferrule[Case]
+    { 
+        \JUDGE{\EXPR{\exprx{}}}{\expr{}'}
+        \\
+        (\JUDGE{\ALT{\alt{1}}}{\alt{1}'})
+        \metaell
+        (\JUDGE{\ALT{\alt{n}}}{\alt{n}'})
+    }
+    {\JUDGE
+        {\EXPR{
+            \zlst{case\ } \exprx{} \zlst{\ of\ }
+            \zlst{\{} \alt{1} \zlst{;\ } \metaell \zlst{;\ } \alt{n} \zlst{;\}}
+        }}
+        {
+            \zlst{case\ } \expr{}' \zlst{\ of\ } 
+            \zlst{\{} \alt{1}' \zlst{;\ } \metaell \zlst{;\ } \alt{n}' \zlst{;\}}
+        }
+    }
+\end{mathpar}
+}
+
+    \caption{Case expression translation}
+    \label{fig:trans-expr-case}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% End case
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\subsection*{Operator semantics}
+\def\lf{\left\lfloor}   
+\def\rf{\right\rfloor}
+
+\begin{figure}[H]
+\begin{mathpar}
+    OP(\zlst{+}, int_1, int_2) = int_1 + int_2
+    \and
+    OP(\zlst{-}, int_1, int_2) = int_1 - int_2
+    \and
+    OP(\zlst{*}, int_1, int_2) = int_1 \times int_2
+    \and
+    OP(\zlst{`div`}, int_1, int_2) = \lf \frac{int_1}{int_2} \rf
+    \\
+    OP(\zlst{&&}, \zlst{False}, \zlst{False}) = \zlst{False}
+    \and
+    OP(\zlst{&&}, \zlst{False}, \zlst{True}) = \zlst{False}
+    \and
+    OP(\zlst{&&}, \zlst{True}, \zlst{False}) = \zlst{False}
+    \and
+    OP(\zlst{&&}, \zlst{True}, \zlst{True}) = \zlst{True}
+    \\
+    OP(\zlst{||}, \zlst{False}, \zlst{False}) = \zlst{False}
+    \and
+    OP(\zlst{||}, \zlst{False}, \zlst{True}) = \zlst{False}
+    \and
+    OP(\zlst{||}, \zlst{True}, \zlst{False}) = \zlst{False}
+    \and
+    OP(\zlst{||}, \zlst{True}, \zlst{True}) = \zlst{True}
+    \\
+    OP(\zlst{==}, val, val) = \zlst{True}
+    \and
+    OP(\zlst{==}, val_1, val_2),val_1 \neq val_2 = \zlst{False} 
+    \\
+    OP(\zlst{/=}, val, val) = \zlst{False}
+    \and
+    OP(\zlst{/=}, val_1, val_2),val_1 \neq val_2  = \zlst{True} 
+    \\
+    OP(\zlst{>}, int_1, int_2) = int_1 > int_2
+    \\
+    OP(\zlst{>}, int_1, int_2) = int_1 > int_2
+    \and
+    OP(\zlst{<}, int_1, int_2) = int_1 < int_2
+\end{mathpar}
+
+\caption{Operator semantics}
+\label{fig:sem-mini-ops}
+\end{figure}
+
+% The following diagram depicts a translation over 
+% 
+% \begin{figure}[H]
+% \centering
+% \begin{mathpar}
+%     \zlst[mathescape]![x{1} $\oplus$ y{1}, ..., x{k} $\oplus$ y{k}]!
+% \\
+%     {\Tree [.$\oplus$ \zlst!x\{1\}! [.\zlst!y\{1\}! ] ]}
+%     \ELL{}{}
+%     {\Tree [.$\oplus$ \zlst!x\{k\}! [.\zlst!y\{k\}! ] ]}
+% \and
+%     \raisebox{-16pt}{\scalebox{2}{$\rightsquigarrow$}}
+% \and
+%     \Tree [.$\oplus$ $\ELL{\zlst!x\{1\}!}{\zlst!x\{k\}!}$ [.$\ELL{\zlst!y\{1\}!}{\zlst!y\{k\}!}$ ] ]
+% \and
+%     \raisebox{-16pt}{\scalebox{2}{$\rightsquigarrow$}}
+% \and
+%     {\Tree [.$\oplus$ $\freshv{1}$ [.$\freshv{2}$ ] ]}
+% \\
+%     \zlst[mathescape]!zipWith ($\oplus$) (slice x 1 k) (slice y 1 k)!
+% \end{mathpar}
+% %\caption{Syntax tree translation traversal over infix functions}
+% %\label{fig:trans-infer-traversal-tree}
+% \end{figure}
+% 
+% Note that the translation pairs \zlst!x{1}! with \zlst!x{k}!, and \zlst!y{1}! with \zlst!y{k}!.
+% This is so the interpolation translator knows that \zlst!x! goes from \zlst!1! to \zlst!k!,
+% and the same for \zlst!y!.
+
+
+% \inferrule[Empty-to-ellipsis]
+%     {
+%         \JUDGE
+%             {
+%                 \EXPR {\zlst{[}\exprx{r_1}\zlst{, ...,\ }\exprx{r_2}\zlst{]}}
+%             }
+%             {
+%                 \jpair{\expr{r}}
+%             }
+%     }
+%     {\JUDGE
+%         {
+%             \ELL{\zlst{[]}}
+%                 {\zlst{[}\exprx{r_1}\zlst{, ...,\ }\exprx{r_2}\zlst{]}}
+%         }
+%         {  \jpair
+%             {\freshv{}}
+%             {
+%                 \SET{(\freshv{}, \zlst{inits\ } \expr{r})}
+%             }
+%         }
+%     }
+%     
+% \inferrule[Ellipsis-to-empty]
+%     {
+%         \JUDGE
+%             {
+%                 \EXPR {\zlst{[}\exprx{r_1}\zlst{, ...,\ }\exprx{r_2}\zlst{]}}
+%             }
+%             {
+%                 \jpair{\expr{r}}
+%             }
+%     }
+%     {\JUDGE
+%         {
+%             \ELL{\zlst{[}\exprx{r_1}\zlst{, ...,\ }\exprx{r_2}\zlst{]}}
+%                 {\zlst{[]}}
+%         }
+%         {  \jpair
+%             {\freshv{}}
+%             {
+%                 \SET{(\freshv{}, \zlst{reverse (inits\ } \expr{r}\zlst{)})}
+%             }
+%         }
+%     }
+
+%The function $f$ and the set of list expressions
+%are produced by \textit{ellipsis interpolation translation},
+%which is described in Section \ref{ellipsis-inference-translation}.
+%In essence, the interpolation compares both sides of the ellipsis expression
+%and replaces sections that vary with fresh variables, while extracting the lists.
+%Interpolation is denoted
+%$\JUDGE{\ELL{\exprx{1}}{\exprx{2}}}{\jpair{\expr{}}{\slices{}}}$, where
+%$\exprx{1}$ is the left-hand side of the ellipsis,
+%and $\exprx{2}$ is the right-hand side of the ellipsis.
+%$\expr{}$ is the translated expression with fresh variables,
+%and $\slices{}$ is an environment containing the fresh variables and corresponding lists.
