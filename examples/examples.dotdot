@@ -35,6 +35,12 @@ null xs = xs == []
 
 lengthelli [x1, ..., xn] = n
 
+just x = [x]
+
+dud p x = if p then [x] else []
+
+undud = concat
+
 ------------------------------------------------------------------------
 -- 
 -- LIST TRANSFORMATIONS
@@ -181,7 +187,7 @@ findIndices2 p [x1, ..., xn] = foldr cat [] $
 
 takeelli k [x1, ..., xn] = [x1, ..., xk]
 
-dropelli k [x1, ..., xn] = [xk, ..., xn]
+dropelli k [x1, ..., xn] = [x{k+1}, ..., xn]
 
 splitAt k [x1, ..., xn] = ([x1, ..., xk], [x{k+1}, ..., xn])
 
@@ -339,19 +345,12 @@ nub [x1, ..., xn] = concat
     , if xn `elem` [x1, ..., x{n-1}] then [] else [xn]
     ]
 
-{-
-nub2 [x1, ..., xn] = 
-    (if x1 `elem` []                then [] else [x1])
-    ++ ... ++
-    (if xn `elem` [x1, ..., x{n-1}] then [] else [xn])
-    ++ []
-    -}
-
-{-
-nub [x1, ..., xn] = foldr cat [] $
-    from if x1 `elem` []                then [] else [x1]
-    to   if xn `elem` [x1, ..., x{n-1}] then [] else [xn]
-    -}
+nub2 [x1, ..., xn] = undud
+    [ just x1
+    , dud (x2 `notElem` [x1]) x2
+    , ...
+    , dud (xn `notElem` [x1, ..., x{n-1}]) xn
+    ]
 
 delete y [x1, ..., xn] = case elemIndices1 y [x1, ..., xn] of {
     []      -> [x1, ..., xn];
@@ -501,3 +500,13 @@ sort [x1, ..., xn] =
     ]
 
 allEq [x1, ..., xn] = x2 == x1 && ... && xn == x1 && True
+
+f1 i j = [1000 * i, ..., 1000 * j]
+
+mulThousand x = 1000 * x
+
+f2 i j = [mulThousand i, ..., mulThousand j]
+
+p n = 1^2 + 2^2 + ... + n^2
+
+poly x [c1, ..., cn] = 0 + c1 * x^(0) + ... + cn * x^(n-1)
