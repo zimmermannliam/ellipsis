@@ -26,7 +26,7 @@ import qualified Data.Set (Set)
 import Data.Bifunctor
 import Data.Function ((&))
 
-import Debug.Trace (trace, traceShowId)
+import Debug.Trace (trace, traceShowId, traceM)
 
 data ElliClass = Fold Expr ElliClass
                | ZipWith Int
@@ -144,13 +144,13 @@ tInterpolateGo :: Expr -> Expr -> MaybeT (State ElliState) Expr
 -- xi...xk ==> collect (id, x, i, k) and output _x<id> as a variable
 tInterpolateGo (ListElement nl idxl) (ListElement nr idxr)
     | nl /= nr      = error "ListElements refer to different lists"
-    | idxl == idxr  = mzero
+    | idxl == idxr  = return $ subscriptFun `App` (Var nl) `App` (Op Sub (idxl) (Value $ Con 1))
     | otherwise = do
         (id, rs) <- lift get
         let er = ElliRange { ed_id=id
                            , ed_t=ElliList nl
-                           , ed_ib=idxToExpr idxl
-                           , ed_ie=idxToExpr idxr
+                           , ed_ib=translate idxl
+                           , ed_ie=translate idxr
                            }
         lift $ put (id+1, er:rs)
         return $ Var $ makeElliAlias er
@@ -164,6 +164,8 @@ tInterpolateGo (Ellipsis ll lr) (Ellipsis rl rr) = do
     -- increasing the id for the purpose of disambiguation.
     let (l, (idl, _)) = runState (runMaybeT $ tElliExpr' ll lr) (id,[])
     let (r, (idr, _)) = runState (runMaybeT $ tElliExpr' rl rr) (id,[])
+    traceM $ show l
+    traceM $ show r
     l' <- hoistMaybe l
     r' <- hoistMaybe r
     guard $ trace (pp l' ++ "\n" ++ pp r') idl == idr  -- Just quickly check the state
@@ -236,7 +238,7 @@ tInterpolateGo elist@(Cons el1 _) ell@(Ellipsis er1 er2) = do
     else if e_tail == er2
         then do
             let newRange = ElliRange { ed_t = ElliExpr $ 
-                Var "drop" `App` Value (Con $ length elist') `App` (Var "reverse") `App` (Var "tails" `App` r')
+                Var "drop" `App` Value (Con $ length elist') `App` ((Var "reverse") `App` (Var "tails" `App` r'))
                                     , ed_ie = Value (Con 0)
                                     , ed_ib = Value (Con 0)
                                     , ed_id = id+idr+1
@@ -289,6 +291,12 @@ tInterpolateGo ell@(Ellipsis er1 er2) elist@(Cons el1 _) = do
     runInterpolate s l r = runState (runMaybeT $ tInterpolate l r) s
 
 -}
+
+tInterpolateGo (Var "subscript" `App` (Var varl) `App` idxl)
+               (Var "subscript" `App` (Var varr) `App` idxr)
+    = tInterpolateGo (ListElement varl (Op Add idxl (inte 1)))
+                     (ListElement varr (Op Add idxr (inte 1)))
+
 -- Catch-all: if you can take both sides and turn it into a simple counter,
 -- then do that. Otherwise, keep iterating in.
 tInterpolateGo l r 
@@ -301,7 +309,7 @@ tInterpolateGo l r
         return $ Var $ makeElliAlias er
   where
     isElliAble :: Expr -> Bool
-    isElliAble = isInt
+    isElliAble = isRangeExpr
 
 ------------------------------------------------------------------------
 -- 
@@ -370,3 +378,11 @@ exprCalc t = do
         y' <- go y
         return [(xI * yI, xS ++ yS) | (xI, xS) <- x', (yI, yS) <- y']
     go _ = Nothing
+
+isRangeExpr :: Expr -> Bool
+isRangeExpr (Var _) = True
+isRangeExpr (Value (Con _)) = True
+isRangeExpr (Op Add el er) = isRangeExpr el && isRangeExpr er
+isRangeExpr (Op Mod el er) = isRangeExpr el && isRangeExpr er
+isRangeExpr (Op Sub el er) = isRangeExpr el && isRangeExpr er
+isRangeExpr _ = False

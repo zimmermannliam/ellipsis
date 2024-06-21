@@ -16,7 +16,7 @@ buildPrelude env ((s,e):bs) =
 buildPrelude env [] = Map.empty
 
 toZipWithN :: Int -> Expr
-toZipWithN 0 = Var "id"
+-- toZipWithN 0 = Var "id"
 toZipWithN 1 = Var "map"
 toZipWithN 2 = Var "zipWith"
 toZipWithN i = Var ("zipWith" ++ show i)
@@ -67,4 +67,6 @@ prePrelude =
     , ("inits", Abstr "list" (LetRec "go" (Abstr "ys" (Abstr "xs" (Case (Var "xs") [(PVal Empty,Cons (Var "ys") (Value Empty)),(PCons "x" "xr",Cons (Var "ys") (App (App (Var "go") (Op (VarOp "cat") (Var "ys") (Cons (Var "x") (Value Empty)))) (Var "xr")))]))) (App (App (Var "go") (Value Empty)) (Var "list"))))
     , ("not", (Abstr "x" (Case (Var "x") [(PVal (Boolean True),Value (Boolean False)),(PVal (Boolean False),Value (Boolean True))])))
     , ("tails", Abstr "list" (LetRec "go" (Abstr "xs" (Case (Var "xs") [(PVal Empty,Cons (Value Empty) (Value Empty)),(PCons "x" "xr",Cons (Cons (Var "x") (Var "xr")) (App (Var "go") (Var "xr")))])) (App (Var "go") (Var "list"))))
+    , ("indices", Abstr "is" (Abstr "xs" (LetRec "go" (Abstr "is" (Case (Var "is") [(PVal Empty,Value Empty),(PCons "i" "ir",Cons ((Var "subscript") `App` (Var "xs") `App` (Op Sub (Var "i") (Value (Con 1)))) (App (Var "go") (Var "ir")))])) (App (Var "go") (Var "is")))))
+    , ("pow", Abstr "x" (Abstr "n" (Case (Op Eq (Var "x") (Value (Con 0))) [(PVal (Boolean True),Value (Con 0)),(PVal (Boolean False),LetRec "go" (Abstr "i" (Case (Var "i") [(PVal (Con 0),Value (Con 1)),(PVar "ii",Op Mul (Var "x") (App (Var "go") (Op Sub (Var "ii") (Value (Con 1)))))])) (App (Var "go") (Var "n")))])))
     ]
