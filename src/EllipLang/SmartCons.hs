@@ -34,6 +34,10 @@ ycomb = Abstr "f" $
             App (Abstr "x" $ App (Var "f" ) (App (Var "x") (Var "x")))
                 (Abstr "x" $ App (Var "f" ) (App (Var "x") (Var "x")))
 
+-- \f -> (\x -> f (\y -> x x y)) (\x -> f (\y -> x x y))
+fix :: Expr
+fix = f <.> (x <.> f `App` (y <.> x `App` x `App` y)) `App` (x <.> f `App` (y <.> x `App` x `App` y))
+
 listToVCons :: [Val] -> Val
 listToVCons  = foldr VCons Empty
 

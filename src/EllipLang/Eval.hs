@@ -18,7 +18,7 @@ import Data.Function ((&))
 
 import EllipLang.Syntax
 import EllipLang.Pretty (pp, ppVal, ppEnv, makeElliAlias)
-import EllipLang.SmartCons ( listToVCons, unVCons, ycomb, vcons )
+import EllipLang.SmartCons ( listToVCons, unVCons, fix, vcons )
 
 
 ------------------------------------------------------------------------
@@ -50,7 +50,7 @@ eval e (Value v)            = v
 eval e (Case tc ps) = patternMatchEval e tc ps
 eval e (Let n t1 t2) = eval (Map.insert (NamedVar n) (BVal $ eval e t1) e) t2
 eval e (LetRec n t1 t2) = case eval e t1 of
-    Closure {}  -> eval (Map.insert (NamedVar n) (BVal $ eval e $ App ycomb (Abstr n t1)) e) t2
+    Closure {}  -> eval (Map.insert (NamedVar n) (BVal $ eval e $ App fix (Abstr n t1)) e) t2
     _           -> eval e (Let n t1 t2)
 
 -- Ellipsis/list operators
