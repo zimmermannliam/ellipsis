@@ -25,8 +25,9 @@ main = do
     contents <- hGetContents handle
     let testFns = processFile contents
     env <- runFile prelude testFns
-    runTestTTAndExit $ test $ simpleExamples env
-
+    runTestTTAndExit $ test $ allExamples env
+  where
+    allExamples env = (simpleExamples env) ++ (furtherExamples env)
 
 ------------------------------------------------------------------------
 -- Tests
@@ -165,6 +166,25 @@ simpleExamples env = map (\(s, val) -> s ~: runExpr env s ~?= val)
     insertAt k y xs = (take (k) xs) ++ [y] ++ (drop k xs)
     replace k y xs = (take (k-1) xs) ++ [y] ++ (drop k xs)
     isEven x = (x `mod` 2) == 0
+
+furtherExamples env = map (\(s, val) -> s ~: runExpr env s ~?= val)
+    [ ("neighborst list1",          vPairVCons $ neighbors list1)
+    , ("neighborst list2",          vPairVCons $ neighbors list2)
+    , ("neighborst list3",          vPairVCons $ neighbors list3)
+    , ("neighborst []",             vPairVCons $ neighbors [])
+    , ("neighborst [1]",            vPairVCons $ neighbors [1])
+
+    , ("isPrefixOft (take 2 list1) list1",         Boolean $ isPrefixOf (take 2 list1) list1)
+    , ("isPrefixOft [list1{3}, list1{4}] list1", Boolean $ isPrefixOf ([list1!!2, list1!!3]) list1)
+    
+    , ("isSuffixOft (drop 2 list1) list1", Boolean $ isPrefixOf (drop 2 list1) list1)
+    , ("isSuffixOft [list1{3}, list1{4}] list1", Boolean $ isSuffixOf [list1!!2, list1!!3] list1)
+
+    , ("isInfixOft (take 2 (drop 1 (list1))) list1", Boolean $ isInfixOf (take 2 (drop 1 (list1))) list1)
+    , ("isInfixOft [list1{1}, list1{5}] list1", Boolean $ isInfixOf [list1!!0, list1!!4] list1)
+    ]
+  where
+    neighbors xs = zip xs (drop 1 xs)
 
 ------------------------------------------------------------------------
 -- Helpers
